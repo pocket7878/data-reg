@@ -13,4 +13,4 @@ vec-reg-macro = { version = "0.2.0", path = "../macro" }
 vec-reg-common = { version = "0.2.0", path = "../common" }
 
 [package.metadata.release]
-tag = false
+tag = true
