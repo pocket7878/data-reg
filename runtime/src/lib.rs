@@ -91,4 +91,13 @@ mod test {
         assert!(reg4.is_match(&[1, 2, 3]));
         assert!(!reg4.is_match(&[1, 2, 3, 4]));
     }
+
+    #[test]
+    fn match_inverse_macro() {
+        let is_even = |x: &i32| x % 2 == 0;
+        let reg1 = vec_reg!([^is_even]).compile();
+        let reg2 = vec_reg!([^|x| x % 2 == 0]).compile();
+        assert!(reg1.is_match(&[1]));
+        assert!(reg2.is_match(&[1]));
+    }
 }

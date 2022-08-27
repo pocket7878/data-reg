@@ -11,6 +11,8 @@ use self::compiler::compile_regex;
 pub enum Regex<T> {
     /// Like a `[character class]` in regex. Regex that matches any values that satisfy the given predicate.
     Satisfy(Rc<dyn Fn(&T) -> bool>),
+    /// Like a `[^character class]` in regex. Regex that matches any values that not satisfy the given predicate.
+    NotSatisfy(Rc<dyn Fn(&T) -> bool>),
     /// Like a `RS` in regex. Concatenate two regex.
     Concat(Box<Regex<T>>, Box<Regex<T>>),
     /// Like a `(R)` in regex. Grouping regex.
@@ -32,7 +34,8 @@ pub enum Regex<T> {
 impl<T> std::fmt::Debug for Regex<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Regex::Satisfy(_) => write!(f, "[#<fn>]"),
+            Regex::Satisfy(_) => write!(f, "[<fn>]"),
+            Regex::NotSatisfy(_) => write!(f, "[^ <fn>]"),
             Regex::Concat(l, r) => write!(f, "{:?}{:?}", l, r),
             Regex::Group(r) => write!(f, "({:?})", r),
             Regex::Or(l, r) => write!(f, "{:?}|{:?}", l, r),
@@ -55,6 +58,11 @@ impl<T: 'static> Regex<T> {
     /// Like a `[character class]` in regex. Build regex that matches any value that satisfies the given predicate.
     pub fn satisfy(f: impl Fn(&T) -> bool + 'static) -> Self {
         Regex::Satisfy(Rc::new(f))
+    }
+
+    /// Like a `[^character class]` in regex. Build regex that matches any value that not satisfies the given predicate.
+    pub fn not_satisfy(f: impl Fn(&T) -> bool + 'static) -> Self {
+        Regex::NotSatisfy(Rc::new(move |x| !f(x)))
     }
 
     /// Like a `.` in regex. Build regex that matches any value.
@@ -241,6 +249,15 @@ mod test {
         assert!(!reg.is_match(&[1]));
         assert!(reg.is_match(&[2]));
         assert!(!reg.is_match(&[3]));
+    }
+
+    #[test]
+    fn match_not_statisfy() {
+        let reg = Regex::not_satisfy(|v| v % 2 == 0).compile();
+        assert!(!reg.is_match(&[0]));
+        assert!(reg.is_match(&[1]));
+        assert!(!reg.is_match(&[2]));
+        assert!(reg.is_match(&[3]));
     }
 
     #[test]
