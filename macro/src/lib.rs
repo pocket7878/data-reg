@@ -21,10 +21,19 @@ impl RegexMacroInput {
         if input.peek(syn::token::Bracket) {
             let braced_content;
             bracketed!(braced_content in input);
+            let inverse = braced_content.parse::<syn::Token![^]>().is_ok();
             if let Ok(fn_name) = braced_content.parse::<syn::Ident>() {
-                Ok(syn::parse_quote!(Regex::satisfy(#fn_name)))
+                if inverse {
+                    Ok(syn::parse_quote!(Regex::not_satisfy(#fn_name)))
+                } else {
+                    Ok(syn::parse_quote!(Regex::satisfy(#fn_name)))
+                }
             } else if let Ok(closure) = braced_content.parse::<syn::ExprClosure>() {
-                Ok(syn::parse_quote!(Regex::satisfy(#closure)))
+                if inverse {
+                    Ok(syn::parse_quote!(Regex::not_satisfy(#closure)))
+                } else {
+                    Ok(syn::parse_quote!(Regex::satisfy(#closure)))
+                }
             } else {
                 Err(syn::Error::new(
                     input.span(),
@@ -165,6 +174,8 @@ impl From<RegexMacroInput> for proc_macro2::TokenStream {
 ///
 /// - `[#fn_name]` is a syntax for `Regex::satisfy(fn_name)`.
 /// - `[|x| x % 2 == 0]` is a syntax for `Regex::satisfy(|x| x % 2 == 0)`.
+/// - `[^#fn_name]` is a syntax for `Regex::not_satisfy(fn_name)`.
+/// - `[^|x| x % 2 == 0]` is a syntax for `Regex::not_satisfy(|x| x % 2 == 0)`.
 /// - `.` is a syntax for `Regex::any()`.
 /// - `R|S` is a syntax for `Regex::or(R, S)`.
 /// - `RS` is a syntax for `Regex::concat(R, S)`.

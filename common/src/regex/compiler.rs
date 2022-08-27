@@ -30,6 +30,13 @@ fn generate_nfa_rules<I>(
 
             end_state_id
         }
+        Regex::NotSatisfy(f) => {
+            let end_state_id = start_state_id + 1;
+            let new_rule = nfa::Rule::new_check(start_state_id, end_state_id, f.clone());
+            rule_acc.push(new_rule);
+
+            end_state_id
+        }
         Regex::Group(r) => {
             let inner_start_state_id = start_state_id + 1;
             let inner_end_state_id = generate_nfa_rules(r, rule_acc, inner_start_state_id);
