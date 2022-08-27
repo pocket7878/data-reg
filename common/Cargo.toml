@@ -1,4 +1,9 @@
 [package]
-name = "data-reg-common"
+name = "vec-reg-common"
+description = "Shared models and logics for the vec-reg"
+readme = "../README.md"
 version = "0.1.0"
 edition = "2021"
+authors = ["Masato Sogame <poketo7878@gmail.com>"]
+license-file = "../LICENCE"
+repository = "https://github.com/pocket7878/vec-reg"

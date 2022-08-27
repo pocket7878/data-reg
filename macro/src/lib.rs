@@ -138,7 +138,7 @@ impl From<RegexMacroInput> for proc_macro2::TokenStream {
     }
 }
 
-/// Procedual macro for building data_reg regex expressions.
+/// Procedual macro for building vec_reg regex expressions.
 ///
 /// - `{#fn_name}` is a syntax for `Regex::satisfy(fn_name)`.
 /// - `{|x| x % 2 == 0}` is a syntax for `Regex::satisfy(|x| x % 2 == 0)`.
@@ -151,7 +151,7 @@ impl From<RegexMacroInput> for proc_macro2::TokenStream {
 /// - `(R)` is a syntax for `Regex::group(R)`.
 ///
 #[proc_macro]
-pub fn data_reg(input: TokenStream) -> TokenStream {
+pub fn vec_reg(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as RegexMacroInput);
     let output: proc_macro2::TokenStream = input.into();
 

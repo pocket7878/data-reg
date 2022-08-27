@@ -1,5 +1,5 @@
 pre-release-replacements = [
-  {file="../README.md", search="data-reg = .*", replace="data-reg = \"{{version}}\""},
+  {file="../README.md", search="vec-reg = .*", replace="vec-reg = \"{{version}}\""},
 ]
 
 dev-version = false

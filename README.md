@@ -1,4 +1,4 @@
-# data-reg
+# vec-reg
 
 Generalized regex like pattern match for vector.
 
@@ -7,13 +7,13 @@ Generalized regex like pattern match for vector.
 ```toml
 # Cargo.toml
 [dependencies]
-data-reg = "0.1.0"
+vec-reg = "0.1.0"
 ```
 
 ## Usage
 
 ```rust
-use data_reg::{Regex, data_reg};
+use vec_reg::{Regex, vec_reg};
 
 fn build_without_macro() {
   let is_fizz = |x: &i32| x % 3 == 0;
@@ -32,7 +32,7 @@ fn build_without_macro() {
 fn build_with_macro() {
   let is_fizz = |x: &i32| x % 3 == 0;
   let is_buzz = |x: &i32| x % 5 == 0;
-  let mut reg = data_reg!({is_fizz}({is_buzz}{|x| x % 15 == 0})+).compile();    
+  let mut reg = vec_reg!({is_fizz}({is_buzz}{|x| x % 15 == 0})+).compile();    
   assert!(!reg.is_match(&vec![1, 2, 3]));
   assert!(reg.is_match(&vec![3, 5, 15]));
   assert!(reg.is_match(&vec![6, 10, 15, 10, 30]));

@@ -1,6 +1,6 @@
-use data_reg_common::Regex;
-use data_reg_macro::data_reg;
+use vec_reg_common::Regex;
+use vec_reg_macro::vec_reg;
 
 fn main() {
-    data_reg!({ |x: &i32| x % 2 == 0 });
+    vec_reg!({ |x: &i32| x % 2 == 0 });
 }

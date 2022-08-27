@@ -1,10 +1,13 @@
 [package]
-name = "data-reg"
+name = "vec-reg"
+description = "Generalized regex like pattern matching for vector"
+readme = "../README.md"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Masato Sogame <poketo7878@gmail.com>"]
+license-file = "../LICENCE"
+repository = "https://github.com/pocket7878/vec-reg"
 
 [dependencies]
-data-reg-macro = { path = "../macro" }
-data-reg-common = { path = "../common" }
+vec-reg-macro = { version = "0.1.0", path = "../macro" }
+vec-reg-common = { version = "0.1.0", path = "../common" }

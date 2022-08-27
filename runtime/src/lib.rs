@@ -2,7 +2,7 @@
 //! Generalized regex like pattern match for vector.
 //!
 //!  ```rust
-//!  use data_reg::{Regex, CompiledRegex, data_reg};
+//!  use vec_reg::{Regex, CompiledRegex, vec_reg};
 //!
 //!  fn build_without_macro() {
 //!      let is_fizz = |x: &i32| x % 3 == 0;
@@ -21,15 +21,15 @@
 //!  fn build_with_macro() {
 //!      let is_fizz = |x: &i32| x % 3 == 0;
 //!      let is_buzz = |x: &i32| x % 5 == 0;
-//!      let reg = data_reg!({is_fizz}({is_buzz}{|x| x % 15 == 0})+).compile();    
+//!      let reg = vec_reg!({is_fizz}({is_buzz}{|x| x % 15 == 0})+).compile();    
 //!      assert!(!reg.is_match(&vec![1, 2, 3]));
 //!      assert!(reg.is_match(&vec![3, 5, 15]));
 //!      assert!(reg.is_match(&vec![6, 10, 15, 10, 30]));
 //!  }
 //!  ```
 
-pub use data_reg_common::{CompiledRegex, Regex};
-pub use data_reg_macro::data_reg;
+pub use vec_reg_common::{CompiledRegex, Regex};
+pub use vec_reg_macro::vec_reg;
 
 #[cfg(test)]
 mod test {
@@ -57,7 +57,7 @@ mod test {
     fn match_with_macro() {
         let is_fizz = |x: &i32| x % 3 == 0;
         let is_buzz = |x: &i32| x % 5 == 0;
-        let reg = data_reg!({is_fizz}({is_buzz}{|x| x % 15 == 0})+).compile();
+        let reg = vec_reg!({is_fizz}({is_buzz}{|x| x % 15 == 0})+).compile();
         assert!(!reg.is_match(&[1, 2, 3]));
         assert!(reg.is_match(&[3, 5, 15]));
         assert!(reg.is_match(&[6, 10, 15, 10, 30]));
