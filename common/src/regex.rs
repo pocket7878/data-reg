@@ -16,6 +16,7 @@ pub enum Regex<T> {
     ZeroOrOne(Box<Regex<T>>),
     Repeat0(Box<Regex<T>>),
     Repeat1(Box<Regex<T>>),
+    RepeatN(Box<Regex<T>>, usize),
 }
 
 impl<T> std::fmt::Debug for Regex<T> {
@@ -28,6 +29,7 @@ impl<T> std::fmt::Debug for Regex<T> {
             Regex::Repeat0(r) => write!(f, "{:?}*", r),
             Regex::ZeroOrOne(r) => write!(f, "{:?}?", r),
             Regex::Repeat1(r) => write!(f, "{:?}+", r),
+            Regex::RepeatN(r, n) => write!(f, "{:?}{}", r, n),
         }
     }
 }
@@ -51,6 +53,10 @@ impl<T: 'static> Regex<T> {
 
     pub fn repeat0(reg: Self) -> Self {
         Regex::Repeat0(reg.into())
+    }
+
+    pub fn repeat_n(reg: Self, n: usize) -> Self {
+        Regex::RepeatN(reg.into(), n)
     }
 
     pub fn concat(r: Self, s: Self) -> Self {
@@ -128,7 +134,7 @@ mod test {
     }
 
     #[test]
-    fn match_star() {
+    fn match_repeat0() {
         let reg = Regex::repeat0(Regex::is(1)).compile();
         assert!(reg.is_match(&[]));
         assert!(reg.is_match(&[1]));
@@ -136,12 +142,21 @@ mod test {
     }
 
     #[test]
-    fn match_some() {
+    fn match_repeat1() {
         let reg = Regex::repeat1(Regex::is(1)).compile();
         assert!(!reg.is_match(&[]));
         assert!(reg.is_match(&[1]));
         assert!(reg.is_match(&[1, 1]));
         assert!(!reg.is_match(&[1, 2]));
+    }
+
+    #[test]
+    fn match_repeat_n() {
+        let reg = Regex::repeat_n(Regex::is(1), 3).compile();
+        assert!(!reg.is_match(&[]));
+        assert!(!reg.is_match(&[1]));
+        assert!(reg.is_match(&[1, 1, 1]));
+        assert!(!reg.is_match(&[1, 1, 1, 1]));
     }
 
     #[test]

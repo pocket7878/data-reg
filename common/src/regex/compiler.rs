@@ -88,17 +88,6 @@ fn generate_nfa_rules<I>(
 
             end_state_id
         }
-        Regex::ZeroOrOne(r) => {
-            let inner_start_state_id = start_state_id + 1;
-            let inner_end_state_id = generate_nfa_rules(r, rule_acc, inner_start_state_id);
-            let end_state_id = inner_end_state_id + 1;
-
-            rule_acc.push(nfa::Rule::new_epsilon(start_state_id, inner_start_state_id));
-            rule_acc.push(nfa::Rule::new_epsilon(inner_end_state_id, end_state_id));
-            rule_acc.push(nfa::Rule::new_epsilon(start_state_id, end_state_id));
-
-            end_state_id
-        }
         Regex::Repeat1(r) => {
             let inner_start_state_id = start_state_id + 1;
             let inner_end_state_id = generate_nfa_rules(r, rule_acc, inner_start_state_id);
@@ -110,6 +99,37 @@ fn generate_nfa_rules<I>(
                 inner_start_state_id,
             ));
             rule_acc.push(nfa::Rule::new_epsilon(inner_end_state_id, end_state_id));
+
+            end_state_id
+        }
+        Regex::RepeatN(r, n) => {
+            let inner_chain_start_state_id = start_state_id + 1;
+
+            let mut inner_start_state_id = inner_chain_start_state_id;
+            let mut inner_end_state_id = 0;
+            for _ in 1..=*n {
+                inner_end_state_id = generate_nfa_rules(r, rule_acc, inner_start_state_id);
+                inner_start_state_id = inner_end_state_id
+            }
+
+            let end_state_id = inner_end_state_id + 1;
+
+            rule_acc.push(nfa::Rule::new_epsilon(
+                start_state_id,
+                inner_chain_start_state_id,
+            ));
+            rule_acc.push(nfa::Rule::new_epsilon(inner_end_state_id, end_state_id));
+
+            end_state_id
+        }
+        Regex::ZeroOrOne(r) => {
+            let inner_start_state_id = start_state_id + 1;
+            let inner_end_state_id = generate_nfa_rules(r, rule_acc, inner_start_state_id);
+            let end_state_id = inner_end_state_id + 1;
+
+            rule_acc.push(nfa::Rule::new_epsilon(start_state_id, inner_start_state_id));
+            rule_acc.push(nfa::Rule::new_epsilon(inner_end_state_id, end_state_id));
+            rule_acc.push(nfa::Rule::new_epsilon(start_state_id, end_state_id));
 
             end_state_id
         }
