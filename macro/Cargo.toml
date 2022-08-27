@@ -2,7 +2,7 @@
 name = "vec-reg-macro"
 description = "Procedural macros for vec-reg"
 readme = "../README.md"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Masato Sogame <poketo7878@gmail.com>"]
 license-file = "../LICENCE"
@@ -14,7 +14,7 @@ repository = "https://github.com/pocket7878/vec-reg"
 quote = "1.0"
 syn = {version = "1.0", features = ["full"]}
 proc-macro2 = "1.0.43"
-vec-reg-common = { version = "0.1.0", path = "../common" }
+vec-reg-common = { version = "0.2.0", path = "../common" }
 
 [lib]
 proc-macro = true

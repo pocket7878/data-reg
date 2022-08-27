@@ -7,7 +7,7 @@ Generalized regex like pattern match for vector.
 ```toml
 # Cargo.toml
 [dependencies]
-vec-reg = "0.1.0"
+vec-reg = "0.2.0"
 ```
 
 ## Usage
