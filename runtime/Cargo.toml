@@ -5,6 +5,7 @@ readme = "../README.md"
 version = "0.2.0"
 edition = "2021"
 authors = ["Masato Sogame <poketo7878@gmail.com>"]
+licence = "Apache-2.0"
 license-file = "../LICENCE"
 repository = "https://github.com/pocket7878/vec-reg"
 
