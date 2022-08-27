@@ -2,7 +2,7 @@
 name = "vec-reg"
 description = "Generalized regex like pattern matching for vector"
 readme = "../README.md"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Masato Sogame <poketo7878@gmail.com>"]
 licence = "Apache-2.0"
@@ -10,8 +10,8 @@ license-file = "../LICENCE"
 repository = "https://github.com/pocket7878/vec-reg"
 
 [dependencies]
-vec-reg-macro = { version = "0.2.0", path = "../macro" }
-vec-reg-common = { version = "0.2.0", path = "../common" }
+vec-reg-macro = { version = "0.3.0", path = "../macro" }
+vec-reg-common = { version = "0.3.0", path = "../common" }
 
 [package.metadata.release]
 tag = true
