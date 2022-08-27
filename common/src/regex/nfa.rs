@@ -1,5 +1,3 @@
-mod dfa_builder;
-
 use std::collections::{BTreeSet, HashSet};
 use std::rc::Rc;
 

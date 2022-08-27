@@ -1,6 +1,6 @@
-[package]
-name = "data-reg"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
+[workspace]
+members = [
+	"runtime",
+	"macro",
+	"common"
+]

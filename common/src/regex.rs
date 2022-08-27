@@ -11,10 +11,25 @@ use self::compiler::compile_regex;
 pub enum Regex<T> {
     Satisfy(Rc<dyn Fn(&T) -> bool>),
     Concat(Box<Regex<T>>, Box<Regex<T>>),
+    Group(Box<Regex<T>>),
     Or(Box<Regex<T>>, Box<Regex<T>>),
     Star(Box<Regex<T>>),
     Lone(Box<Regex<T>>),
     Some(Box<Regex<T>>),
+}
+
+impl<T> std::fmt::Debug for Regex<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Regex::Satisfy(_) => write!(f, "{{#<fn>}}"),
+            Regex::Concat(l, r) => write!(f, "{:?}{:?}", l, r),
+            Regex::Group(r) => write!(f, "({:?})", r),
+            Regex::Or(l, r) => write!(f, "{:?}|{:?}", l, r),
+            Regex::Star(r) => write!(f, "{:?}*", r),
+            Regex::Lone(r) => write!(f, "{:?}?", r),
+            Regex::Some(r) => write!(f, "{:?}+", r),
+        }
+    }
 }
 
 impl<T: 'static> Regex<T> {
@@ -44,6 +59,10 @@ impl<T: 'static> Regex<T> {
 
     pub fn or(left: Self, right: Self) -> Self {
         Regex::Or(left.into(), right.into())
+    }
+
+    pub fn group(reg: Self) -> Self {
+        Regex::Group(reg.into())
     }
 
     pub fn is(value: T) -> Self
@@ -93,6 +112,12 @@ mod test {
     #[test]
     fn match_concat() {
         let mut reg = Regex::concat(Regex::is(1), Regex::is(2)).compile();
+        assert!(reg.is_match(&[1, 2]));
+    }
+
+    #[test]
+    fn test_group() {
+        let mut reg = Regex::group(Regex::concat(Regex::is(1), Regex::is(2))).compile();
         assert!(reg.is_match(&[1, 2]));
     }
 
