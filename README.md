@@ -2,6 +2,10 @@
 
 Generalized regex like pattern match for vector.
 
+[![Build status](https://github.com/pocket7878/vec-reg/actions/workflows/check.yaml/badge.svg?branch=main)](https://github.com/pocket7878/vec-reg/actions/workflows/check.yml)
+[![Crates.io](https://img.shields.io/crates/v/vec-reg)](https://crates.io/crates/vec-reg)
+[![Documentation](https://docs.rs/vec-reg/badge.svg)](https://docs.rs/vec-reg)
+
 ## Install
 
 ```toml
