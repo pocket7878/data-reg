@@ -122,6 +122,59 @@ fn generate_nfa_rules<I>(
 
             end_state_id
         }
+        Regex::RepeatMinMax(r, n, m) => {
+            // Generate n times rule first.
+            let inner_chain_start_state_id = start_state_id + 1;
+
+            let mut n_start_state_id = inner_chain_start_state_id;
+            let mut n_end_state_id = 0;
+            for _ in 1..=*n {
+                n_end_state_id = generate_nfa_rules(r, rule_acc, n_start_state_id);
+                n_start_state_id = n_end_state_id
+            }
+            rule_acc.push(nfa::Rule::new_epsilon(
+                start_state_id,
+                inner_chain_start_state_id,
+            ));
+
+            let end_state_id;
+            if let Some(m) = m {
+                // generate (m - n) times rule.
+                let jump_point_state_id = n_end_state_id + 1;
+                let mut m_start_state_id = jump_point_state_id + 1;
+
+                rule_acc.push(nfa::Rule::new_epsilon(n_end_state_id, m_start_state_id));
+                for _ in 1..=(*m - *n) {
+                    let m_end_state_id = generate_nfa_rules(r, rule_acc, m_start_state_id);
+                    rule_acc.push(nfa::Rule::new_epsilon(m_end_state_id, jump_point_state_id));
+                    m_start_state_id = m_end_state_id
+                }
+
+                end_state_id = jump_point_state_id
+            } else {
+                // 0 or more times rules.
+                let repeat_start_state_id = n_end_state_id + 1;
+                let repeat_end_state_id = generate_nfa_rules(r, rule_acc, repeat_start_state_id);
+                rule_acc.push(nfa::Rule::new_epsilon(
+                    n_end_state_id,
+                    repeat_start_state_id,
+                ));
+                rule_acc.push(nfa::Rule::new_epsilon(
+                    repeat_end_state_id,
+                    repeat_start_state_id,
+                ));
+                rule_acc.push(nfa::Rule::new_epsilon(
+                    repeat_start_state_id,
+                    repeat_end_state_id,
+                ));
+
+                end_state_id = repeat_end_state_id;
+            }
+
+            // Connect the end of the n times rule to the end.
+            rule_acc.push(nfa::Rule::new_epsilon(n_end_state_id, end_state_id));
+            end_state_id
+        }
         Regex::ZeroOrOne(r) => {
             let inner_start_state_id = start_state_id + 1;
             let inner_end_state_id = generate_nfa_rules(r, rule_acc, inner_start_state_id);

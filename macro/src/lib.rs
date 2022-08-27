@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use syn::parse::{Parse, ParseStream};
-use syn::{bracketed, parenthesized, parse_macro_input, Result};
+use syn::{braced, bracketed, parenthesized, parse_macro_input, Result};
 
 #[derive(Debug)]
 struct RegexMacroInput {
@@ -36,19 +36,42 @@ impl RegexMacroInput {
         }
     }
 
-    // parse ?, +, * optional meta characters.
+    // parse ?, +, *, {n}, {n,}, {n,m} meta characters.
     fn parse_optional_meta_character(
         input: ParseStream,
         base_regex_expr: proc_macro2::TokenStream,
-    ) -> proc_macro2::TokenStream {
+    ) -> Result<proc_macro2::TokenStream> {
         if input.parse::<syn::token::Question>().is_ok() {
-            syn::parse_quote!(Regex::zero_or_one(#base_regex_expr))
+            Ok(syn::parse_quote!(Regex::zero_or_one(#base_regex_expr)))
         } else if input.parse::<syn::token::Star>().is_ok() {
-            syn::parse_quote!(Regex::repeat0(#base_regex_expr))
+            Ok(syn::parse_quote!(Regex::repeat0(#base_regex_expr)))
         } else if input.parse::<syn::Token![+]>().is_ok() {
-            syn::parse_quote!(Regex::repeat1(#base_regex_expr))
+            Ok(syn::parse_quote!(Regex::repeat1(#base_regex_expr)))
+        } else if input.peek(syn::token::Brace) {
+            let braced_content;
+            braced!(braced_content in input);
+            if let Ok(n_lit) = braced_content.parse::<syn::LitInt>() {
+                if braced_content.parse::<syn::token::Comma>().is_ok() {
+                    if let Ok(m_lit) = braced_content.parse::<syn::LitInt>() {
+                        Ok(
+                            syn::parse_quote!(Regex::repeat_min_max(#base_regex_expr, #n_lit, #m_lit)),
+                        )
+                    } else if braced_content.is_empty() {
+                        Ok(syn::parse_quote!(Regex::repeat_n_or_more(#base_regex_expr, #n_lit)))
+                    } else {
+                        Err(syn::Error::new(
+                            braced_content.span(),
+                            "expected integer literal or empty",
+                        ))
+                    }
+                } else {
+                    Ok(syn::parse_quote!(Regex::repeat_n(#base_regex_expr, #n_lit)))
+                }
+            } else {
+                Err(syn::Error::new(input.span(), "expected integer literal"))
+            }
         } else {
-            base_regex_expr
+            Ok(base_regex_expr)
         }
     }
 
@@ -74,7 +97,7 @@ impl RegexMacroInput {
 
     fn parse_factor(input: ParseStream) -> Result<proc_macro2::TokenStream> {
         match Self::parse_atom(input) {
-            Ok(atom) => Ok(Self::parse_optional_meta_character(input, atom)),
+            Ok(atom) => Self::parse_optional_meta_character(input, atom),
             Err(error) => Err(error),
         }
     }
@@ -149,6 +172,9 @@ impl From<RegexMacroInput> for proc_macro2::TokenStream {
 /// - `R+` is a syntax for `Regex::repeat1(R)`.
 /// - `R?` is a syntax for `Regex::zero_or_one(R)`.
 /// - `(R)` is a syntax for `Regex::group(R)`.
+/// - `R{n}` is a syntax for `Regex::repeat_n(R, n)`.
+/// - `R{n,}` is a syntax for `Regex::repeat_min_max(R, n, None)`.
+/// - `R{n,m}` is a syntax for `Regex::repeat_min_max(R, n, Some(m))`.
 ///
 #[proc_macro]
 pub fn vec_reg(input: TokenStream) -> TokenStream {
