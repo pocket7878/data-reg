@@ -21,7 +21,7 @@
 //!  fn build_with_macro() {
 //!      let is_fizz = |x: &i32| x % 3 == 0;
 //!      let is_buzz = |x: &i32| x % 5 == 0;
-//!      let reg = vec_reg!({is_fizz}({is_buzz}{|x| x % 15 == 0})+).compile();    
+//!      let reg = vec_reg!([is_fizz]([is_buzz][|x| x % 15 == 0])+).compile();    
 //!      assert!(!reg.is_match(&vec![1, 2, 3]));
 //!      assert!(reg.is_match(&vec![3, 5, 15]));
 //!      assert!(reg.is_match(&vec![6, 10, 15, 10, 30]));
@@ -57,7 +57,7 @@ mod test {
     fn match_with_macro() {
         let is_fizz = |x: &i32| x % 3 == 0;
         let is_buzz = |x: &i32| x % 5 == 0;
-        let reg = vec_reg!({is_fizz}({is_buzz}{|x| x % 15 == 0})+).compile();
+        let reg = vec_reg!([is_fizz]([is_buzz][|x| x % 15 == 0])+).compile();
         assert!(!reg.is_match(&[1, 2, 3]));
         assert!(reg.is_match(&[3, 5, 15]));
         assert!(reg.is_match(&[6, 10, 15, 10, 30]));

@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use syn::parse::{Parse, ParseStream};
-use syn::{braced, parenthesized, parse_macro_input, Result};
+use syn::{bracketed, parenthesized, parse_macro_input, Result};
 
 #[derive(Debug)]
 struct RegexMacroInput {
@@ -16,11 +16,11 @@ impl RegexMacroInput {
         }
     }
 
-    // parse {#<ident>} or {#<closure>} syntax to Regex::statisfy
+    // parse [#<ident>] or [#<closure>] syntax to Regex::statisfy
     fn parse_satisfy(input: ParseStream) -> Result<proc_macro2::TokenStream> {
-        if input.peek(syn::token::Brace) {
+        if input.peek(syn::token::Bracket) {
             let braced_content;
-            braced!(braced_content in input);
+            bracketed!(braced_content in input);
             if let Ok(fn_name) = braced_content.parse::<syn::Ident>() {
                 Ok(syn::parse_quote!(Regex::satisfy(#fn_name)))
             } else if let Ok(closure) = braced_content.parse::<syn::ExprClosure>() {
@@ -140,8 +140,8 @@ impl From<RegexMacroInput> for proc_macro2::TokenStream {
 
 /// Procedual macro for building vec_reg regex expressions.
 ///
-/// - `{#fn_name}` is a syntax for `Regex::satisfy(fn_name)`.
-/// - `{|x| x % 2 == 0}` is a syntax for `Regex::satisfy(|x| x % 2 == 0)`.
+/// - `[#fn_name]` is a syntax for `Regex::satisfy(fn_name)`.
+/// - `[|x| x % 2 == 0]` is a syntax for `Regex::satisfy(|x| x % 2 == 0)`.
 /// - `.` is a syntax for `Regex::any()`.
 /// - `R|S` is a syntax for `Regex::or(R, S)`.
 /// - `RS` is a syntax for `Regex::concat(R, S)`.

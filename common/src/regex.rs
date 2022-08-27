@@ -21,7 +21,7 @@ pub enum Regex<T> {
 impl<T> std::fmt::Debug for Regex<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Regex::Satisfy(_) => write!(f, "{{#<fn>}}"),
+            Regex::Satisfy(_) => write!(f, "[#<fn>]"),
             Regex::Concat(l, r) => write!(f, "{:?}{:?}", l, r),
             Regex::Group(r) => write!(f, "({:?})", r),
             Regex::Or(l, r) => write!(f, "{:?}|{:?}", l, r),
