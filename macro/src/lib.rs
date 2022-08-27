@@ -1,10 +1,10 @@
 use proc_macro::TokenStream;
 use syn::parse::{Parse, ParseStream};
-use syn::{parse_macro_input, Result, braced, parenthesized};
+use syn::{braced, parenthesized, parse_macro_input, Result};
 
 #[derive(Debug)]
 struct RegexMacroInput {
-   tt: proc_macro2::TokenStream,
+    tt: proc_macro2::TokenStream,
 }
 
 impl RegexMacroInput {
@@ -26,7 +26,10 @@ impl RegexMacroInput {
             } else if let Ok(closure) = braced_content.parse::<syn::ExprClosure>() {
                 Ok(syn::parse_quote!(Regex::satisfy(#closure)))
             } else {
-                Err(syn::Error::new(input.span(), "expected closure or function name"))
+                Err(syn::Error::new(
+                    input.span(),
+                    "expected closure or function name",
+                ))
             }
         } else {
             Err(syn::Error::new(input.span(), "expected brace"))
@@ -34,20 +37,23 @@ impl RegexMacroInput {
     }
 
     // parse ?, +, * optional meta characters.
-    fn parse_optional_meta_character(input: ParseStream, base_regex_expr: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    fn parse_optional_meta_character(
+        input: ParseStream,
+        base_regex_expr: proc_macro2::TokenStream,
+    ) -> proc_macro2::TokenStream {
         if input.parse::<syn::token::Question>().is_ok() {
-            syn::parse_quote!(Regex::lone(#base_regex_expr))
+            syn::parse_quote!(Regex::zero_or_one(#base_regex_expr))
         } else if input.parse::<syn::token::Star>().is_ok() {
-            syn::parse_quote!(Regex::star(#base_regex_expr))
+            syn::parse_quote!(Regex::repeat0(#base_regex_expr))
         } else if input.parse::<syn::Token![+]>().is_ok() {
-            syn::parse_quote!(Regex::some(#base_regex_expr))
+            syn::parse_quote!(Regex::repeat1(#base_regex_expr))
         } else {
             base_regex_expr
         }
     }
 
     fn parse_atom(input: ParseStream) -> Result<proc_macro2::TokenStream> {
-        if let Ok(any_regex) = Self::parse_any(input){
+        if let Ok(any_regex) = Self::parse_any(input) {
             Ok(any_regex)
         } else if let Ok(satisfy_regex) = Self::parse_satisfy(input) {
             Ok(satisfy_regex)
@@ -59,15 +65,16 @@ impl RegexMacroInput {
                 Err(error) => Err(error),
             }
         } else {
-            return Err(syn::Error::new(input.span(), "expreted '.' or {#<ident>} or {#<closure>} or (#<regex>)"));
+            Err(syn::Error::new(
+                input.span(),
+                "expreted '.' or {#<ident>} or {#<closure>} or (#<regex>)",
+            ))
         }
     }
 
     fn parse_factor(input: ParseStream) -> Result<proc_macro2::TokenStream> {
         match Self::parse_atom(input) {
-            Ok(atom) => {
-                Ok(Self::parse_optional_meta_character(input, atom))
-            }
+            Ok(atom) => Ok(Self::parse_optional_meta_character(input, atom)),
             Err(error) => Err(error),
         }
     }
@@ -97,7 +104,7 @@ impl RegexMacroInput {
         let term = Self::parse_term(input)?;
         let mut terms = vec![];
         terms.push(term);
-        
+
         while input.parse::<syn::Token![|]>().is_ok() {
             terms.push(Self::parse_term(input)?);
         }
@@ -117,21 +124,32 @@ impl Parse for RegexMacroInput {
                 if input.is_empty() {
                     Ok(Self { tt })
                 } else {
-                    return Err(syn::Error::new(input.span(), "unexpected tokens"));
+                    Err(syn::Error::new(input.span(), "unexpected tokens"))
                 }
-            },
+            }
             Err(error) => Err(error),
         }
     }
 }
 
-impl Into<proc_macro2::TokenStream> for RegexMacroInput {
-    fn into(self) -> proc_macro2::TokenStream {
-        self.tt
+impl From<RegexMacroInput> for proc_macro2::TokenStream {
+    fn from(input: RegexMacroInput) -> Self {
+        input.tt
     }
 }
 
-
+/// Procedual macro for building data_reg regex expressions.
+///
+/// - `{#fn_name}` is a syntax for `Regex::satisfy(fn_name)`.
+/// - `{|x| x % 2 == 0}` is a syntax for `Regex::satisfy(|x| x % 2 == 0)`.
+/// - `.` is a syntax for `Regex::any()`.
+/// - `R|S` is a syntax for `Regex::or(R, S)`.
+/// - `RS` is a syntax for `Regex::concat(R, S)`.
+/// - `R*` is a syntax for `Regex::repeat0(R)`.
+/// - `R+` is a syntax for `Regex::repeat1(R)`.
+/// - `R?` is a syntax for `Regex::zero_or_one(R)`.
+/// - `(R)` is a syntax for `Regex::group(R)`.
+///
 #[proc_macro]
 pub fn data_reg(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as RegexMacroInput);

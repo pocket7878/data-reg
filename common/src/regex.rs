@@ -1,5 +1,5 @@
 mod compiler;
-mod dfa;
+pub(crate) mod dfa;
 mod nfa;
 
 use std::rc::Rc;
@@ -13,9 +13,9 @@ pub enum Regex<T> {
     Concat(Box<Regex<T>>, Box<Regex<T>>),
     Group(Box<Regex<T>>),
     Or(Box<Regex<T>>, Box<Regex<T>>),
-    Star(Box<Regex<T>>),
-    Lone(Box<Regex<T>>),
-    Some(Box<Regex<T>>),
+    ZeroOrOne(Box<Regex<T>>),
+    Repeat0(Box<Regex<T>>),
+    Repeat1(Box<Regex<T>>),
 }
 
 impl<T> std::fmt::Debug for Regex<T> {
@@ -25,9 +25,9 @@ impl<T> std::fmt::Debug for Regex<T> {
             Regex::Concat(l, r) => write!(f, "{:?}{:?}", l, r),
             Regex::Group(r) => write!(f, "({:?})", r),
             Regex::Or(l, r) => write!(f, "{:?}|{:?}", l, r),
-            Regex::Star(r) => write!(f, "{:?}*", r),
-            Regex::Lone(r) => write!(f, "{:?}?", r),
-            Regex::Some(r) => write!(f, "{:?}+", r),
+            Regex::Repeat0(r) => write!(f, "{:?}*", r),
+            Regex::ZeroOrOne(r) => write!(f, "{:?}?", r),
+            Regex::Repeat1(r) => write!(f, "{:?}+", r),
         }
     }
 }
@@ -41,16 +41,16 @@ impl<T: 'static> Regex<T> {
         Regex::Satisfy(Rc::new(|_| true))
     }
 
-    pub fn lone(reg: Self) -> Self {
-        Regex::Lone(reg.into())
+    pub fn zero_or_one(reg: Self) -> Self {
+        Regex::ZeroOrOne(reg.into())
     }
 
-    pub fn some(reg: Self) -> Self {
-        Regex::Some(reg.into())
+    pub fn repeat1(reg: Self) -> Self {
+        Regex::Repeat1(reg.into())
     }
 
-    pub fn star(reg: Self) -> Self {
-        Regex::Star(reg.into())
+    pub fn repeat0(reg: Self) -> Self {
+        Regex::Repeat0(reg.into())
     }
 
     pub fn concat(r: Self, s: Self) -> Self {
@@ -87,7 +87,7 @@ impl<T: 'static> Regex<T> {
         }
     }
 
-    pub fn compile(&self) -> impl CompiledRegex<T> {
+    pub fn compile(&self) -> CompiledRegex<T> {
         compile_regex(self)
     }
 }
@@ -98,38 +98,38 @@ mod test {
 
     #[test]
     fn match_is() {
-        let mut reg = Regex::is(1).compile();
+        let reg = Regex::is(1).compile();
         assert!(reg.is_match(&[1]));
     }
 
     #[test]
     fn match_or() {
-        let mut reg = Regex::or(Regex::is(1), Regex::is(2)).compile();
+        let reg = Regex::or(Regex::is(1), Regex::is(2)).compile();
         assert!(reg.is_match(&[1]));
         assert!(reg.is_match(&[2]));
     }
 
     #[test]
     fn match_concat() {
-        let mut reg = Regex::concat(Regex::is(1), Regex::is(2)).compile();
+        let reg = Regex::concat(Regex::is(1), Regex::is(2)).compile();
         assert!(reg.is_match(&[1, 2]));
     }
 
     #[test]
     fn test_group() {
-        let mut reg = Regex::group(Regex::concat(Regex::is(1), Regex::is(2))).compile();
+        let reg = Regex::group(Regex::concat(Regex::is(1), Regex::is(2))).compile();
         assert!(reg.is_match(&[1, 2]));
     }
 
     #[test]
     fn match_seq() {
-        let mut reg = Regex::seq(&[1, 2]).compile();
+        let reg = Regex::seq(&[1, 2]).compile();
         assert!(reg.is_match(&[1, 2]));
     }
 
     #[test]
     fn match_star() {
-        let mut reg = Regex::star(Regex::is(1)).compile();
+        let reg = Regex::repeat0(Regex::is(1)).compile();
         assert!(reg.is_match(&[]));
         assert!(reg.is_match(&[1]));
         assert!(reg.is_match(&[1, 1]));
@@ -137,7 +137,7 @@ mod test {
 
     #[test]
     fn match_some() {
-        let mut reg = Regex::some(Regex::is(1)).compile();
+        let reg = Regex::repeat1(Regex::is(1)).compile();
         assert!(!reg.is_match(&[]));
         assert!(reg.is_match(&[1]));
         assert!(reg.is_match(&[1, 1]));
@@ -145,8 +145,8 @@ mod test {
     }
 
     #[test]
-    fn match_lone() {
-        let mut reg = Regex::lone(Regex::is(1)).compile();
+    fn match_zero_or_one() {
+        let reg = Regex::zero_or_one(Regex::is(1)).compile();
         assert!(reg.is_match(&[]));
         assert!(reg.is_match(&[1]));
         assert!(!reg.is_match(&[1, 1]));
@@ -154,7 +154,7 @@ mod test {
 
     #[test]
     fn match_statisfy() {
-        let mut reg = Regex::satisfy(|v| v % 2 == 0).compile();
+        let reg = Regex::satisfy(|v| v % 2 == 0).compile();
         assert!(reg.is_match(&[0]));
         assert!(!reg.is_match(&[1]));
         assert!(reg.is_match(&[2]));
@@ -163,7 +163,7 @@ mod test {
 
     #[test]
     fn match_any() {
-        let mut reg = Regex::any().compile();
+        let reg = Regex::any().compile();
         assert!(reg.is_match(&[1]));
         assert!(reg.is_match(&[42]));
     }
@@ -173,16 +173,16 @@ mod test {
         let is_fizz = |x: &i32| x % 3 == 0;
         let is_buzz = |x: &i32| x % 5 == 0;
         let is_fizz_buzz = |x: &i32| x % 15 == 0;
-        let mut reg = Regex::concat(
+        let reg = Regex::concat(
             Regex::satisfy(is_fizz),
-            Regex::some(Regex::concat(
+            Regex::repeat1(Regex::concat(
                 Regex::satisfy(is_buzz),
                 Regex::satisfy(is_fizz_buzz),
             )),
         )
         .compile();
-        assert!(!reg.is_match(&vec![1, 2, 3]));
-        assert!(reg.is_match(&vec![3, 5, 15]));
-        assert!(reg.is_match(&vec![6, 10, 15, 10, 30]));
+        assert!(!reg.is_match(&[1, 2, 3]));
+        assert!(reg.is_match(&[3, 5, 15]));
+        assert!(reg.is_match(&[6, 10, 15, 10, 30]));
     }
 }

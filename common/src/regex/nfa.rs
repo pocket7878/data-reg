@@ -1,14 +1,15 @@
 use std::collections::{BTreeSet, HashSet};
 use std::rc::Rc;
 
+use super::dfa;
 use super::dfa::DFA;
-use super::{dfa, CompiledRegex};
 
-type State = usize;
+pub(crate) type State = usize;
 
 pub struct Rule<I> {
     from: State,
     to: State,
+    #[allow(clippy::type_complexity)]
     pub(crate) check: Option<Rc<dyn Fn(&I) -> bool>>,
 }
 
@@ -114,10 +115,12 @@ impl<I> EpsilonNFA<I> {
         true
     }
 
+    #[allow(dead_code)]
     fn reset(&mut self) {
         self.current_state = self._initial_state.clone();
     }
 
+    #[allow(dead_code)]
     fn run(&mut self, inputs: &[I]) -> bool {
         for input in inputs {
             if !self.try_update(input) {
@@ -127,6 +130,7 @@ impl<I> EpsilonNFA<I> {
         true
     }
 
+    #[allow(dead_code)]
     fn accept(&mut self, inputs: &[I]) -> bool {
         self.run(inputs)
             && self
@@ -170,12 +174,5 @@ impl<I> EpsilonNFA<I> {
         }
 
         DFA::new(first_dfa_state, rules, goal_states)
-    }
-}
-
-impl<I> CompiledRegex<I> for EpsilonNFA<I> {
-    fn is_match(&mut self, input: &[I]) -> bool {
-        self.reset();
-        self.accept(input)
     }
 }

@@ -1,6 +1,16 @@
 # data-reg
 
-Regex like pattern match for data sequence.
+Generalized regex like pattern match for vector.
+
+## Install
+
+```toml
+# Cargo.toml
+[dependencies]
+data-reg = "0.1.0"
+```
+
+## Usage
 
 ```rust
 use data_reg::{Regex, data_reg};
@@ -11,7 +21,7 @@ fn build_without_macro() {
   let is_fizz_buzz = |x: &i32| x % 15 == 0;
   let mut reg = Regex::concat(
       Regex::satisfy(is_fizz),
-      Regex::some(Regex::concat(Regex::satisfy(is_buzz), Regex::satisfy(is_fizz_buzz))),
+      Regex::repeat1(Regex::concat(Regex::satisfy(is_buzz), Regex::satisfy(is_fizz_buzz))),
   )
   .compile();
   assert!(!reg.is_match(&vec![1, 2, 3]));

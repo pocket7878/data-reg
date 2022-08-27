@@ -4,9 +4,11 @@ use crate::{CompiledRegex, Regex};
 
 use super::nfa;
 
-pub fn compile_regex<I>(reg: &Regex<I>) -> impl CompiledRegex<I> {
+pub fn compile_regex<I>(reg: &Regex<I>) -> CompiledRegex<I> {
     let nfa = compile_regex_to_nfa(reg);
-    nfa.to_dfa()
+    CompiledRegex {
+        automaton: nfa.to_dfa(),
+    }
 }
 
 fn compile_regex_to_nfa<I>(reg: &Regex<I>) -> nfa::EpsilonNFA<I> {
@@ -71,7 +73,7 @@ fn generate_nfa_rules<I>(
 
             end_state_id
         }
-        Regex::Star(r) => {
+        Regex::Repeat0(r) => {
             let inner_start_state_id = start_state_id + 1;
             let inner_end_state_id = generate_nfa_rules(r, rule_acc, inner_start_state_id);
             let end_state_id = inner_end_state_id + 1;
@@ -86,7 +88,7 @@ fn generate_nfa_rules<I>(
 
             end_state_id
         }
-        Regex::Lone(r) => {
+        Regex::ZeroOrOne(r) => {
             let inner_start_state_id = start_state_id + 1;
             let inner_end_state_id = generate_nfa_rules(r, rule_acc, inner_start_state_id);
             let end_state_id = inner_end_state_id + 1;
@@ -97,7 +99,7 @@ fn generate_nfa_rules<I>(
 
             end_state_id
         }
-        Regex::Some(r) => {
+        Regex::Repeat1(r) => {
             let inner_start_state_id = start_state_id + 1;
             let inner_end_state_id = generate_nfa_rules(r, rule_acc, inner_start_state_id);
             let end_state_id = inner_end_state_id + 1;

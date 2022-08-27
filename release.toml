@@ -1,0 +1,7 @@
+pre-release-replacements = [
+  {file="../README.md", search="data-reg = .*", replace="data-reg = \"{{version}}\""},
+]
+
+dev-version = false
+shared-version = true
+consolidate-commits = true
