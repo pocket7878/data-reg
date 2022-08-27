@@ -7,3 +7,6 @@ edition = "2021"
 authors = ["Masato Sogame <poketo7878@gmail.com>"]
 license-file = "../LICENCE"
 repository = "https://github.com/pocket7878/vec-reg"
+
+[package.metadata.release]
+tag = false

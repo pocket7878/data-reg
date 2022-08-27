@@ -11,3 +11,6 @@ repository = "https://github.com/pocket7878/vec-reg"
 [dependencies]
 vec-reg-macro = { version = "0.1.0", path = "../macro" }
 vec-reg-common = { version = "0.1.0", path = "../common" }
+
+[package.metadata.release]
+tag = false

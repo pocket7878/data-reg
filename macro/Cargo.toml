@@ -25,3 +25,6 @@ path = "tests/tests.rs"
 
 [dev-dependencies]
 trybuild = "1.0"
+
+[package.metadata.release]
+tag = false
