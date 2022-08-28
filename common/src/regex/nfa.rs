@@ -1,8 +1,11 @@
+mod compiler;
 use std::collections::{BTreeSet, HashSet};
 use std::rc::Rc;
 
 use super::dfa;
 use super::dfa::DFA;
+
+pub use compiler::{compile_regex_to_nfa, CompiledRegexInNFA};
 
 pub(crate) type State = usize;
 
@@ -19,6 +22,16 @@ impl<I> std::fmt::Debug for Rule<I> {
             f.write_fmt(format_args!("Rule({} -ε-> {})", self.from, self.to))
         } else {
             f.write_fmt(format_args!("Rule({} -#<fn>-> {})", self.from, self.to))
+        }
+    }
+}
+
+impl<I> Clone for Rule<I> {
+    fn clone(&self) -> Self {
+        Self {
+            from: self.from,
+            to: self.to,
+            check: self.check.clone(),
         }
     }
 }
@@ -80,6 +93,17 @@ impl<I> std::fmt::Debug for EpsilonNFA<I> {
             .field("rules", &self.rules)
             .field("goal_states", &self.goal_states)
             .finish()
+    }
+}
+
+impl<I> Clone for EpsilonNFA<I> {
+    fn clone(&self) -> Self {
+        Self {
+            _initial_state: self._initial_state.clone(),
+            current_state: self.current_state.clone(),
+            rules: self.rules.clone(),
+            goal_states: self.goal_states.clone(),
+        }
     }
 }
 

@@ -1,53 +1,75 @@
-mod compiler;
-pub(crate) mod dfa;
+mod dfa;
 mod nfa;
+pub mod vm;
 
 use std::rc::Rc;
 
-use crate::CompiledRegex;
+use self::vm::CompiledRegexInVm;
+use super::CompiledRegex;
 
-use self::compiler::compile_regex;
-
+#[derive(Clone)]
 pub enum Regex<T> {
     /// Like a `[character class]` in regex. Regex that matches any values that satisfy the given predicate.
     Satisfy(Rc<dyn Fn(&T) -> bool>),
     /// Like a `[^character class]` in regex. Regex that matches any values that not satisfy the given predicate.
     NotSatisfy(Rc<dyn Fn(&T) -> bool>),
     /// Like a `RS` in regex. Concatenate two regex.
-    Concat(Box<Regex<T>>, Box<Regex<T>>),
+    Concat(Rc<Regex<T>>, Rc<Regex<T>>),
     /// Like a `(R)` in regex. Grouping regex.
-    Group(Box<Regex<T>>),
+    Group(Rc<Regex<T>>),
     /// Like a `R|S` in regex. Regex alternation.
-    Or(Box<Regex<T>>, Box<Regex<T>>),
+    Or(Rc<Regex<T>>, Rc<Regex<T>>),
     /// Like a `?` in regex. Regex zero or one.
-    ZeroOrOne(Box<Regex<T>>),
+    ZeroOrOne(Rc<Regex<T>>),
     /// Like a `*` in regex. Regex zero or one.
-    Repeat0(Box<Regex<T>>),
+    Repeat0(Rc<Regex<T>>),
     /// Like a `+` in regex. Regex one or more.
-    Repeat1(Box<Regex<T>>),
+    Repeat1(Rc<Regex<T>>),
     /// Like a `{n}` in regex. Exactly N-times.
-    RepeatN(Box<Regex<T>>, usize),
+    RepeatN(Rc<Regex<T>>, usize),
     /// Like a `{n,m}` or `{n,} in regex. n or n+1 or .. m times.
-    RepeatMinMax(Box<Regex<T>>, usize, Option<usize>),
+    RepeatMinMax(Rc<Regex<T>>, usize, Option<usize>),
 }
 
 impl<T> std::fmt::Debug for Regex<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Regex::Satisfy(_) => f.debug_tuple("Satisfy").field(&"<fn>").finish(),
+            Regex::NotSatisfy(_) => f.debug_tuple("NotSatisfy").field(&"<fn>").finish(),
+            Regex::Concat(l, r) => f.debug_tuple("Concat").field(l).field(r).finish(),
+            Regex::Group(r) => f.debug_tuple("Group").field(r).finish(),
+            Regex::Or(l, r) => f.debug_tuple("Or").field(l).field(r).finish(),
+            Regex::Repeat0(r) => f.debug_tuple("Repeat0").field(r).finish(),
+            Regex::ZeroOrOne(r) => f.debug_tuple("ZeroOrOne").field(r).finish(),
+            Regex::Repeat1(r) => f.debug_tuple("Repeat1").field(r).finish(),
+            Regex::RepeatN(r, n) => f.debug_tuple("RepeatN").field(r).field(n).finish(),
+            Regex::RepeatMinMax(r, n, m) => f
+                .debug_tuple("RepeatMinMax")
+                .field(r)
+                .field(n)
+                .field(m)
+                .finish(),
+        }
+    }
+}
+
+impl<T> std::fmt::Display for Regex<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
             Regex::Satisfy(_) => write!(f, "[<fn>]"),
             Regex::NotSatisfy(_) => write!(f, "[^ <fn>]"),
-            Regex::Concat(l, r) => write!(f, "{:?}{:?}", l, r),
-            Regex::Group(r) => write!(f, "({:?})", r),
-            Regex::Or(l, r) => write!(f, "{:?}|{:?}", l, r),
-            Regex::Repeat0(r) => write!(f, "{:?}*", r),
-            Regex::ZeroOrOne(r) => write!(f, "{:?}?", r),
-            Regex::Repeat1(r) => write!(f, "{:?}+", r),
-            Regex::RepeatN(r, n) => write!(f, "{:?}{{{:?}}}", r, n),
+            Regex::Concat(l, r) => write!(f, "{}{}", l, r),
+            Regex::Group(r) => write!(f, "({})", r),
+            Regex::Or(l, r) => write!(f, "{}|{}", l, r),
+            Regex::Repeat0(r) => write!(f, "{}*", r),
+            Regex::ZeroOrOne(r) => write!(f, "{}?", r),
+            Regex::Repeat1(r) => write!(f, "{}+", r),
+            Regex::RepeatN(r, n) => write!(f, "{}{{{}}}", r, n),
             Regex::RepeatMinMax(r, n, m) => {
                 if let Some(m) = m {
-                    write!(f, "{:?}{{{:?},{:?}}}", r, n, m)
+                    write!(f, "{}{{{},{}}}", r, n, m)
                 } else {
-                    write!(f, "{:?}{{{:?},}}", r, n)
+                    write!(f, "{}{{{},}}", r, n)
                 }
             }
         }
@@ -139,8 +161,10 @@ impl<T: 'static> Regex<T> {
         }
     }
 
-    pub fn compile(&self) -> CompiledRegex<T> {
-        compile_regex(self)
+    pub fn compile(&self) -> impl CompiledRegex<T> {
+        CompiledRegexInVm::compile(self)
+        //CompiledRegexInNFA::compile(self)
+        //CompiledRegexInDFA::compile(self)
     }
 }
 
@@ -151,120 +175,120 @@ mod test {
     #[test]
     fn match_is() {
         let reg = Regex::is(1).compile();
-        assert!(reg.is_match(&[1]));
+        assert!(reg.is_full_match(&[1]));
     }
 
     #[test]
     fn match_or() {
         let reg = Regex::or(Regex::is(1), Regex::is(2)).compile();
-        assert!(reg.is_match(&[1]));
-        assert!(reg.is_match(&[2]));
+        assert!(reg.is_full_match(&[1]));
+        assert!(reg.is_full_match(&[2]));
     }
 
     #[test]
     fn match_concat() {
         let reg = Regex::concat(Regex::is(1), Regex::is(2)).compile();
-        assert!(reg.is_match(&[1, 2]));
+        assert!(reg.is_full_match(&[1, 2]));
     }
 
     #[test]
     fn test_group() {
         let reg = Regex::group(Regex::concat(Regex::is(1), Regex::is(2))).compile();
-        assert!(reg.is_match(&[1, 2]));
+        assert!(reg.is_full_match(&[1, 2]));
     }
 
     #[test]
     fn match_seq() {
         let reg = Regex::seq(&[1, 2]).compile();
-        assert!(reg.is_match(&[1, 2]));
+        assert!(reg.is_full_match(&[1, 2]));
     }
 
     #[test]
     fn match_repeat0() {
         let reg = Regex::repeat0(Regex::is(1)).compile();
-        assert!(reg.is_match(&[]));
-        assert!(reg.is_match(&[1]));
-        assert!(reg.is_match(&[1, 1]));
+        assert!(reg.is_full_match(&[]));
+        assert!(reg.is_full_match(&[1]));
+        assert!(reg.is_full_match(&[1, 1]));
     }
 
     #[test]
     fn match_repeat1() {
         let reg = Regex::repeat1(Regex::is(1)).compile();
-        assert!(!reg.is_match(&[]));
-        assert!(reg.is_match(&[1]));
-        assert!(reg.is_match(&[1, 1]));
-        assert!(!reg.is_match(&[1, 2]));
+        assert!(!reg.is_full_match(&[]));
+        assert!(reg.is_full_match(&[1]));
+        assert!(reg.is_full_match(&[1, 1]));
+        assert!(!reg.is_full_match(&[1, 2]));
     }
 
     #[test]
     fn match_repeat_n() {
-        let reg = Regex::repeat_n(Regex::is(1), 3).compile();
-        assert!(!reg.is_match(&[]));
-        assert!(!reg.is_match(&[1]));
-        assert!(reg.is_match(&[1, 1, 1]));
-        assert!(!reg.is_match(&[1, 1, 1, 1]));
+        let reg = Regex::repeat_n(Regex::is(1), 2).compile();
+        assert!(!reg.is_full_match(&[]));
+        assert!(!reg.is_full_match(&[1]));
+        assert!(reg.is_full_match(&[1, 1]));
+        assert!(!reg.is_full_match(&[1, 1, 1]));
     }
 
     #[test]
     fn match_repeat_n_or_more() {
         let reg = Regex::repeat_n_or_more(Regex::is(1), 3).compile();
-        assert!(!reg.is_match(&[1, 1]));
-        assert!(reg.is_match(&[1, 1, 1]));
-        assert!(reg.is_match(&[1, 1, 1, 1]));
-        assert!(reg.is_match(&[1, 1, 1, 1, 1]));
-        assert!(reg.is_match(&[1, 1, 1, 1, 1, 1]));
+        assert!(!reg.is_full_match(&[1, 1]));
+        assert!(reg.is_full_match(&[1, 1, 1]));
+        assert!(reg.is_full_match(&[1, 1, 1, 1]));
+        assert!(reg.is_full_match(&[1, 1, 1, 1, 1]));
+        assert!(reg.is_full_match(&[1, 1, 1, 1, 1, 1]));
     }
 
     #[test]
     fn match_repeat_min_max() {
         let reg = Regex::repeat_min_max(Regex::is(1), 3, 5).compile();
-        assert!(!reg.is_match(&[1, 1]));
-        assert!(reg.is_match(&[1, 1, 1]));
-        assert!(reg.is_match(&[1, 1, 1, 1]));
-        assert!(reg.is_match(&[1, 1, 1, 1, 1]));
-        assert!(!reg.is_match(&[1, 1, 1, 1, 1, 1]));
+        assert!(!reg.is_full_match(&[1, 1]));
+        assert!(reg.is_full_match(&[1, 1, 1]));
+        assert!(reg.is_full_match(&[1, 1, 1, 1]));
+        assert!(reg.is_full_match(&[1, 1, 1, 1, 1]));
+        assert!(!reg.is_full_match(&[1, 1, 1, 1, 1, 1]));
     }
 
     #[test]
     fn match_repeat_zero_to_n_times() {
         let reg = Regex::repeat_min_max(Regex::is(1), 0, 2).compile();
-        assert!(reg.is_match(&[]));
-        assert!(reg.is_match(&[1]));
-        assert!(reg.is_match(&[1, 1]));
-        assert!(!reg.is_match(&[1, 1, 1]));
+        assert!(reg.is_full_match(&[]));
+        assert!(reg.is_full_match(&[1]));
+        assert!(reg.is_full_match(&[1, 1]));
+        assert!(!reg.is_full_match(&[1, 1, 1]));
     }
 
     #[test]
     fn match_zero_or_one() {
         let reg = Regex::zero_or_one(Regex::is(1)).compile();
-        assert!(reg.is_match(&[]));
-        assert!(reg.is_match(&[1]));
-        assert!(!reg.is_match(&[1, 1]));
+        assert!(reg.is_full_match(&[]));
+        assert!(reg.is_full_match(&[1]));
+        assert!(!reg.is_full_match(&[1, 1]));
     }
 
     #[test]
     fn match_statisfy() {
         let reg = Regex::satisfy(|v| v % 2 == 0).compile();
-        assert!(reg.is_match(&[0]));
-        assert!(!reg.is_match(&[1]));
-        assert!(reg.is_match(&[2]));
-        assert!(!reg.is_match(&[3]));
+        assert!(reg.is_full_match(&[0]));
+        assert!(!reg.is_full_match(&[1]));
+        assert!(reg.is_full_match(&[2]));
+        assert!(!reg.is_full_match(&[3]));
     }
 
     #[test]
     fn match_not_statisfy() {
         let reg = Regex::not_satisfy(|v| v % 2 == 0).compile();
-        assert!(!reg.is_match(&[0]));
-        assert!(reg.is_match(&[1]));
-        assert!(!reg.is_match(&[2]));
-        assert!(reg.is_match(&[3]));
+        assert!(!reg.is_full_match(&[0]));
+        assert!(reg.is_full_match(&[1]));
+        assert!(!reg.is_full_match(&[2]));
+        assert!(reg.is_full_match(&[3]));
     }
 
     #[test]
     fn match_any() {
         let reg = Regex::any().compile();
-        assert!(reg.is_match(&[1]));
-        assert!(reg.is_match(&[42]));
+        assert!(reg.is_full_match(&[1]));
+        assert!(reg.is_full_match(&[42]));
     }
 
     #[test]
@@ -280,8 +304,8 @@ mod test {
             )),
         )
         .compile();
-        assert!(!reg.is_match(&[1, 2, 3]));
-        assert!(reg.is_match(&[3, 5, 15]));
-        assert!(reg.is_match(&[6, 10, 15, 10, 30]));
+        assert!(!reg.is_full_match(&[1, 2, 3]));
+        assert!(reg.is_full_match(&[3, 5, 15]));
+        assert!(reg.is_full_match(&[6, 10, 15, 10, 30]));
     }
 }
