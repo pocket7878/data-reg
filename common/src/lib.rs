@@ -1,10 +1,12 @@
 mod regex;
 
+use std::ops::Range;
+
 pub use regex::Regex;
 
+#[derive(Debug)]
 pub struct Capture<'a, I> {
-    pub start: usize,
-    pub end: usize,
+    pub range: Range<usize>,
     pub values: Vec<&'a I>,
 }
 

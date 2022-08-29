@@ -7,10 +7,10 @@ fn match_without_macro() {
     let is_fizz_buzz = |x: &i32| x % 15 == 0;
     let reg = Regex::concat(
         Regex::satisfy(is_fizz),
-        Regex::repeat1(Regex::concat(
-            Regex::satisfy(is_buzz),
-            Regex::satisfy(is_fizz_buzz),
-        )),
+        Regex::repeat1(
+            Regex::concat(Regex::satisfy(is_buzz), Regex::satisfy(is_fizz_buzz)),
+            true,
+        ),
     )
     .compile();
     assert!(!reg.is_full_match(&[1, 2, 3]));

@@ -12,9 +12,13 @@ pub struct CompiledRegexInVm<I> {
 impl<I> CompiledRegexInVm<I> {
     pub fn compile(reg: &Regex<I>) -> Self {
         let insts = compile_regex_to_vm_insts(reg);
-        Self {
+        let inst = Self {
             insts: Rc::new(insts),
-        }
+        };
+
+        inst.dump_insts();
+
+        inst
     }
 
     #[allow(dead_code)]
@@ -40,8 +44,7 @@ impl<I> CompiledRegex<I> for CompiledRegexInVm<I> {
                     if let Some(end) = saved.get(&(i * 2 + 1)) {
                         let values = input.iter().take(*end).skip(*start).collect();
                         captures.push(Capture {
-                            start: *start,
-                            end: *end - 1,
+                            range: *start..*end,
                             values,
                         });
                     } else {
@@ -121,35 +124,47 @@ fn _compile_regex<I>(
             insts.extend(s_insts);
             new_next_group_index = s_next_group_index
         }
-        Regex::ZeroOrOne(r) => {
+        Regex::ZeroOrOne(r, greedy) => {
             let r_start_pc = start_pc + 1;
             let (r_insts, r_end_pc, r_next_group_index) =
                 _compile_regex(r, r_start_pc, next_group_index);
             end_pc = r_end_pc;
 
-            insts.push(Inst::Split(r_start_pc, r_end_pc + 1));
+            if *greedy {
+                insts.push(Inst::Split(r_start_pc, r_end_pc + 1));
+            } else {
+                insts.push(Inst::Split(r_end_pc + 1, r_start_pc));
+            }
             insts.extend(r_insts);
             new_next_group_index = r_next_group_index;
         }
-        Regex::Repeat0(r) => {
+        Regex::Repeat0(r, greedy) => {
             let r_start_pc = start_pc + 1;
             let (r_insts, r_end_pc, r_next_group_index) =
                 _compile_regex(r, r_start_pc, next_group_index);
             let jmp_inst_pc = r_end_pc + 1;
             end_pc = jmp_inst_pc;
 
-            insts.push(Inst::Split(r_start_pc, jmp_inst_pc + 1));
+            if *greedy {
+                insts.push(Inst::Split(r_start_pc, jmp_inst_pc + 1));
+            } else {
+                insts.push(Inst::Split(jmp_inst_pc + 1, r_start_pc));
+            }
             insts.extend(r_insts);
             insts.push(Inst::Jmp(start_pc));
             new_next_group_index = r_next_group_index;
         }
-        Regex::Repeat1(r) => {
+        Regex::Repeat1(r, greedy) => {
             let (r_insts, r_end_pc, r_next_group_index) =
                 _compile_regex(r, start_pc, next_group_index);
             end_pc = r_end_pc + 1;
 
             insts.extend(r_insts);
-            insts.push(Inst::Split(start_pc, end_pc + 1));
+            if *greedy {
+                insts.push(Inst::Split(start_pc, end_pc + 1));
+            } else {
+                insts.push(Inst::Split(end_pc + 1, start_pc));
+            }
             new_next_group_index = r_next_group_index
         }
         Regex::RepeatN(r, n) => {
@@ -160,8 +175,8 @@ fn _compile_regex<I>(
             end_pc = r_end_pc;
             new_next_group_index = r_next_group_index
         }
-        Regex::RepeatMinMax(r, n, m) => {
-            let expanded_r = expand_repeat_min_max(r.clone(), *n, m);
+        Regex::RepeatMinMax(r, n, m, greedy) => {
+            let expanded_r = expand_repeat_min_max(r.clone(), *n, m, *greedy);
             let (r_insts, r_end_pc, r_next_group_index) =
                 _compile_regex(&expanded_r, start_pc, next_group_index);
             insts.extend(r_insts);
@@ -178,20 +193,25 @@ fn expand_repeat_n<I>(r: Rc<Regex<I>>, n: usize) -> Rc<Regex<I>> {
     concat_regex_list(&regs)
 }
 
-fn expand_repeat_min_max<I>(r: Rc<Regex<I>>, n: usize, m: &Option<usize>) -> Rc<Regex<I>> {
+fn expand_repeat_min_max<I>(
+    r: Rc<Regex<I>>,
+    n: usize,
+    m: &Option<usize>,
+    greedy: bool,
+) -> Rc<Regex<I>> {
     let mut regs = vec![];
     if let Some(m) = m {
         for _ in 1..=n {
             regs.push(r.clone());
         }
         for _ in 1..=(*m - n) {
-            regs.push(Rc::new(Regex::ZeroOrOne(r.clone())));
+            regs.push(Rc::new(Regex::ZeroOrOne(r.clone(), greedy)));
         }
     } else {
         for _ in 1..=(n - 1) {
             regs.push(r.clone());
         }
-        regs.push(Rc::new(Regex::Repeat1(r)));
+        regs.push(Rc::new(Regex::Repeat1(r, greedy)));
     }
 
     concat_regex_list(&regs)

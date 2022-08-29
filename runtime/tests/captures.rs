@@ -7,10 +7,10 @@ fn match_without_macro() {
     let is_fizz_buzz = |x: &i32| x % 15 == 0;
     let reg = Regex::concat(
         Regex::satisfy(is_fizz),
-        Regex::repeat1(Regex::concat(
-            Regex::satisfy(is_buzz),
-            Regex::satisfy(is_fizz_buzz),
-        )),
+        Regex::repeat1(
+            Regex::concat(Regex::satisfy(is_buzz), Regex::satisfy(is_fizz_buzz)),
+            true,
+        ),
     )
     .compile();
     assert!(!reg.is_full_match(&[1, 2, 3]));
@@ -76,12 +76,10 @@ fn test_submatches() {
     assert_eq!(captures.as_ref().unwrap().len(), 2);
 
     let capture_0 = &captures.as_ref().unwrap()[0];
-    assert_eq!(capture_0.start, 0);
-    assert_eq!(capture_0.end, 2);
+    assert_eq!(capture_0.range, 0..3);
     assert_eq!(&capture_0.values, &vec![&2, &4, &6]);
 
     let capture_1 = &captures.as_ref().unwrap()[1];
-    assert_eq!(capture_1.start, 3);
-    assert_eq!(capture_1.end, 5);
+    assert_eq!(capture_1.range, 3..6);
     assert_eq!(&capture_1.values, &vec![&3, &5, &7]);
 }
