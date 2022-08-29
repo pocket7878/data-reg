@@ -3,12 +3,14 @@ use std::rc::Rc;
 pub type PC = usize;
 #[allow(dead_code)]
 pub type SP = usize;
+pub type GroupIndex = usize;
 
 pub enum Inst<I> {
     Check(Rc<dyn Fn(&I) -> bool + 'static>),
     Match,
     Jmp(PC),
     Split(PC, PC),
+    Save(GroupIndex),
 }
 
 impl<I> std::fmt::Debug for Inst<I> {
@@ -20,6 +22,7 @@ impl<I> std::fmt::Debug for Inst<I> {
             Self::Match => write!(f, "Match"),
             Self::Jmp(arg0) => f.debug_tuple("Jmp").field(arg0).finish(),
             Self::Split(arg0, arg1) => f.debug_tuple("Split").field(arg0).field(arg1).finish(),
+            Self::Save(idx) => f.debug_tuple("Save").field(idx).finish(),
         }
     }
 }
@@ -31,6 +34,7 @@ impl<I> Clone for Inst<I> {
             Self::Match => Self::Match,
             Self::Jmp(arg0) => Self::Jmp(*arg0),
             Self::Split(arg0, arg1) => Self::Split(*arg0, *arg1),
+            Self::Save(arg0) => Self::Jmp(*arg0),
         }
     }
 }

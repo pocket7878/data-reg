@@ -1,11 +1,12 @@
-use std::{collections::HashSet, rc::Rc};
+use std::{collections::{HashSet, HashMap}, rc::Rc};
 
 pub use super::inst::Inst;
-use super::inst::PC;
+use super::inst::{PC, SP};
 
-struct Thread<I> {
+pub struct Thread<I> {
     inst: Rc<Vec<Inst<I>>>,
     pub pc: PC,
+    pub saved: HashMap<usize, SP>,
 }
 
 impl<I> Thread<I> {
@@ -34,6 +35,7 @@ impl<I> Clone for Thread<I> {
         Thread {
             inst: self.inst.clone(),
             pc: self.pc,
+            saved: self.saved.clone()
         }
     }
 }
@@ -51,7 +53,7 @@ impl<I> ThreadPool<I> {
         }
     }
 
-    pub fn add_thread(&mut self, th: Thread<I>) {
+    pub fn add_thread(&mut self, th: Thread<I>, sp: SP) {
         if self.seen_pc.contains(&th.pc) {
             return;
         }
@@ -61,17 +63,30 @@ impl<I> ThreadPool<I> {
                 self.add_thread(Thread {
                     inst: th.inst.clone(),
                     pc: *x,
-                });
+                    saved: th.saved,
+                }, sp);
             }
             Inst::Split(x, y) => {
                 self.add_thread(Thread {
                     inst: th.inst.clone(),
                     pc: *x,
-                });
+                    saved: th.saved.clone(),
+                }, sp);
                 self.add_thread(Thread {
                     inst: th.inst.clone(),
                     pc: *y,
-                });
+                    saved: th.saved.clone(),
+                }, sp);
+            }
+            Inst::Save(save_index) => {
+                let mut new_saved = th.saved.clone();
+                new_saved.insert(*save_index, sp);
+
+                self.add_thread(Thread {
+                    inst: th.inst.clone(),
+                    pc: th.pc + 1,
+                    saved: new_saved,
+                }, sp);
             }
             _ => {
                 self.seen_pc.insert(th.pc);
@@ -81,12 +96,12 @@ impl<I> ThreadPool<I> {
     }
 }
 
-pub fn run_vm<I>(insts: Rc<Vec<Inst<I>>>, input: &[I], full_match: bool) -> bool {
+pub fn run_vm<I>(insts: Rc<Vec<Inst<I>>>, input: &[I], full_match: bool) -> Option<Thread<I>> {
     let mut th_pool = ThreadPool::new();
-    th_pool.add_thread(Thread { inst: insts, pc: 0 });
+    th_pool.add_thread(Thread { inst: insts, pc: 0, saved: HashMap::new() }, 0);
 
     let mut sp = 0;
-    let mut matched = false;
+    let mut matched_thread = None;
     'outer: while sp <= input.len() {
         let end_of_input = sp == input.len();
         let mut new_th_pool = ThreadPool::new();
@@ -99,18 +114,19 @@ pub fn run_vm<I>(insts: Rc<Vec<Inst<I>>>, input: &[I], full_match: bool) -> bool
                             new_th_pool.add_thread(Thread {
                                 inst: th.inst.clone(),
                                 pc: th.pc + 1,
-                            });
+                                saved: th.saved.clone(),
+                            }, sp + 1);
                         }
                     }
                 }
                 Inst::Match => {
                     if full_match {
                         if sp == input.len() {
-                            matched = true;
+                            matched_thread = Some(th.clone());
                             break 'outer;
                         }
                     } else {
-                        matched = true;
+                        matched_thread = Some(th.clone());
                         break 'outer;
                     }
                 }
@@ -126,5 +142,5 @@ pub fn run_vm<I>(insts: Rc<Vec<Inst<I>>>, input: &[I], full_match: bool) -> bool
         sp += 1;
     }
 
-    matched
+    matched_thread
 }

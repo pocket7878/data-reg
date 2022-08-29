@@ -65,3 +65,11 @@ fn match_inverse_macro() {
     assert!(reg1.is_full_match(&[1]));
     assert!(reg2.is_full_match(&[1]));
 }
+
+#[test]
+fn test_submatches() {
+    let is_even = |x: &i32| x % 2 == 0;
+    let is_odd = |x: &i32| x % 2 == 1;
+    let reg = vec_reg!(([is_even]+)([is_odd]+)).compile();
+    assert!(reg.is_full_match(&[2, 4, 6, 3, 5, 7]))
+}
