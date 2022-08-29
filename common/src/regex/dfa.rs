@@ -1,8 +1,7 @@
-use std::{collections::BTreeSet, rc::Rc};
+mod compiler;
 
-use crate::{CompiledRegex, Regex};
-
-use super::nfa::compile_regex_to_nfa;
+pub use compiler::CompiledRegexInDFA;
+use std::rc::Rc;
 
 pub struct Rule<S, I> {
     pub from: S,
@@ -86,25 +85,5 @@ impl<S: Clone + PartialEq, I> DFA<S, I> {
 
     pub fn accept(&mut self, inputs: &[I]) -> bool {
         self.run(inputs) && self.goal_states.contains(&self.current_state)
-    }
-}
-
-pub struct CompiledRegexInDFA<I> {
-    dfa: DFA<BTreeSet<usize>, I>,
-}
-
-impl<I> CompiledRegexInDFA<I> {
-    #[allow(dead_code)]
-    pub fn compile(reg: &Regex<I>) -> Self {
-        let nfa = compile_regex_to_nfa(reg);
-        let dfa = nfa.to_dfa();
-
-        Self { dfa }
-    }
-}
-
-impl<I> CompiledRegex<I> for CompiledRegexInDFA<I> {
-    fn is_full_match(&self, input: &[I]) -> bool {
-        self.dfa.clone().accept(input)
     }
 }

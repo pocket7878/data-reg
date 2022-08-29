@@ -1,19 +1,16 @@
 mod compiler;
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
 use std::rc::Rc;
-
-use super::dfa;
-use super::dfa::DFA;
 
 pub use compiler::{compile_regex_to_nfa, CompiledRegexInNFA};
 
 pub(crate) type State = usize;
 
 pub struct Rule<I> {
-    from: State,
-    to: State,
+    pub from: State,
+    pub to: State,
     #[allow(clippy::type_complexity)]
-    pub(crate) check: Option<Rc<dyn Fn(&I) -> bool>>,
+    pub check: Option<Rc<dyn Fn(&I) -> bool>>,
 }
 
 impl<I> std::fmt::Debug for Rule<I> {
@@ -53,7 +50,7 @@ impl<I> Rule<I> {
         }
     }
 
-    fn is_epsilon_rule(&self) -> bool {
+    pub fn is_epsilon_rule(&self) -> bool {
         self.check.is_none()
     }
 }
@@ -80,10 +77,10 @@ pub(crate) fn epsilon_closure<I>(from_states: &[State], rules: &[Rule<I>]) -> BT
 }
 
 pub struct EpsilonNFA<I> {
-    _initial_state: BTreeSet<State>,
-    current_state: BTreeSet<State>,
-    rules: Vec<Rule<I>>,
-    goal_states: BTreeSet<State>,
+    pub _initial_state: BTreeSet<State>,
+    pub current_state: BTreeSet<State>,
+    pub rules: Vec<Rule<I>>,
+    pub goal_states: BTreeSet<State>,
 }
 
 impl<I> std::fmt::Debug for EpsilonNFA<I> {
@@ -161,42 +158,5 @@ impl<I> EpsilonNFA<I> {
                 .goal_states
                 .iter()
                 .any(|g| self.current_state.contains(g))
-    }
-
-    pub(crate) fn to_dfa(&self) -> DFA<BTreeSet<usize>, I> {
-        let first_dfa_state = self._initial_state.clone();
-        let mut rules = Vec::new();
-
-        let mut visited_states = HashSet::new();
-        visited_states.insert(first_dfa_state.clone());
-
-        let mut acc = vec![];
-        acc.push(first_dfa_state.clone());
-        while !acc.is_empty() {
-            let s = acc.pop().unwrap();
-            for r in self.rules.iter() {
-                if !r.is_epsilon_rule() && s.contains(&r.from) {
-                    let to_state = epsilon_closure(&[r.to], &self.rules);
-                    if visited_states.insert(to_state.clone()) {
-                        acc.push(to_state.clone());
-                    }
-                    let dfa_rule = dfa::Rule {
-                        from: s.clone(),
-                        to: to_state,
-                        check: r.check.as_ref().unwrap().clone(),
-                    };
-                    rules.push(dfa_rule);
-                }
-            }
-        }
-
-        let mut goal_states = vec![];
-        for s in visited_states.iter() {
-            if self.goal_states.iter().any(|gs| s.contains(gs)) {
-                goal_states.push(s.clone());
-            }
-        }
-
-        DFA::new(first_dfa_state, rules, goal_states)
     }
 }
