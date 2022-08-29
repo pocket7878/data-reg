@@ -13,20 +13,20 @@ pub enum Regex<T> {
     NotSatisfy(Rc<dyn Fn(&T) -> bool>),
     /// Like a `RS` in regex. Concatenate two regex.
     Concat(Rc<Regex<T>>, Rc<Regex<T>>),
-    /// Like a `(R)` in regex. Grouping regex.
+    /// Like a `(R)` in regex. Numbered capturing group (submatch).
     Group(Rc<Regex<T>>),
     /// Like a `R|S` in regex. Regex alternation.
     Or(Rc<Regex<T>>, Rc<Regex<T>>),
-    /// Like a `?` in regex. Regex zero or one.
-    ZeroOrOne(Rc<Regex<T>>),
-    /// Like a `*` in regex. Regex zero or one.
-    Repeat0(Rc<Regex<T>>),
-    /// Like a `+` in regex. Regex one or more.
-    Repeat1(Rc<Regex<T>>),
+    /// Like a `?`, `??` in regex. Regex zero or one.
+    ZeroOrOne(Rc<Regex<T>>, bool),
+    /// Like a `*`, `*?` in regex. Regex zero or one.
+    Repeat0(Rc<Regex<T>>, bool),
+    /// Like a `+`, `+?` in regex. Regex one or more.
+    Repeat1(Rc<Regex<T>>, bool),
     /// Like a `{n}` in regex. Exactly N-times.
     RepeatN(Rc<Regex<T>>, usize),
-    /// Like a `{n,m}` or `{n,} in regex. n or n+1 or .. m times.
-    RepeatMinMax(Rc<Regex<T>>, usize, Option<usize>),
+    /// Like a `{n,m}`, `{n,m}?` or `{n,}`, `{n,}?` in regex. n or n+1 or .. m times.
+    RepeatMinMax(Rc<Regex<T>>, usize, Option<usize>, bool),
 }
 
 impl<T> std::fmt::Debug for Regex<T> {
@@ -37,15 +37,18 @@ impl<T> std::fmt::Debug for Regex<T> {
             Regex::Concat(l, r) => f.debug_tuple("Concat").field(l).field(r).finish(),
             Regex::Group(r) => f.debug_tuple("Group").field(r).finish(),
             Regex::Or(l, r) => f.debug_tuple("Or").field(l).field(r).finish(),
-            Regex::Repeat0(r) => f.debug_tuple("Repeat0").field(r).finish(),
-            Regex::ZeroOrOne(r) => f.debug_tuple("ZeroOrOne").field(r).finish(),
-            Regex::Repeat1(r) => f.debug_tuple("Repeat1").field(r).finish(),
+            Regex::Repeat0(r, greedy) => f.debug_tuple("Repeat0").field(r).field(greedy).finish(),
+            Regex::ZeroOrOne(r, greedy) => {
+                f.debug_tuple("ZeroOrOne").field(r).field(greedy).finish()
+            }
+            Regex::Repeat1(r, greedy) => f.debug_tuple("Repeat1").field(r).field(greedy).finish(),
             Regex::RepeatN(r, n) => f.debug_tuple("RepeatN").field(r).field(n).finish(),
-            Regex::RepeatMinMax(r, n, m) => f
+            Regex::RepeatMinMax(r, n, m, greedy) => f
                 .debug_tuple("RepeatMinMax")
                 .field(r)
                 .field(n)
                 .field(m)
+                .field(greedy)
                 .finish(),
         }
     }
@@ -59,16 +62,41 @@ impl<T> std::fmt::Display for Regex<T> {
             Regex::Concat(l, r) => write!(f, "{}{}", l, r),
             Regex::Group(r) => write!(f, "({})", r),
             Regex::Or(l, r) => write!(f, "{}|{}", l, r),
-            Regex::Repeat0(r) => write!(f, "{}*", r),
-            Regex::ZeroOrOne(r) => write!(f, "{}?", r),
-            Regex::Repeat1(r) => write!(f, "{}+", r),
-            Regex::RepeatN(r, n) => write!(f, "{}{{{}}}", r, n),
-            Regex::RepeatMinMax(r, n, m) => {
-                if let Some(m) = m {
-                    write!(f, "{}{{{},{}}}", r, n, m)
-                } else {
-                    write!(f, "{}{{{},}}", r, n)
+            Regex::Repeat0(r, greedy) => {
+                write!(f, "{}*", r)?;
+                if !greedy {
+                    write!(f, "?")?;
                 }
+
+                Ok(())
+            }
+            Regex::ZeroOrOne(r, greedy) => {
+                write!(f, "{}?", r)?;
+                if !greedy {
+                    write!(f, "?")?;
+                }
+
+                Ok(())
+            }
+            Regex::Repeat1(r, greedy) => {
+                write!(f, "{}+", r)?;
+                if !greedy {
+                    write!(f, "?")?;
+                }
+                Ok(())
+            }
+            Regex::RepeatN(r, n) => write!(f, "{}{{{}}}", r, n),
+            Regex::RepeatMinMax(r, n, m, greedy) => {
+                if let Some(m) = m {
+                    write!(f, "{}{{{},{}}}", r, n, m)?;
+                } else {
+                    write!(f, "{}{{{},}}", r, n)?;
+                }
+                if !greedy {
+                    write!(f, "?")?;
+                }
+
+                Ok(())
             }
         }
     }
@@ -90,19 +118,19 @@ impl<T: 'static> Regex<T> {
         Regex::Satisfy(Rc::new(|_| true))
     }
 
-    /// Like a `?` in regex. Build regex that matches underlying regex zero or one times.
-    pub fn zero_or_one(reg: Self) -> Self {
-        Regex::ZeroOrOne(reg.into())
+    /// Like a `?`, `??` in regex. Build regex that matches underlying regex zero or one times.
+    pub fn zero_or_one(reg: Self, greedy: bool) -> Self {
+        Regex::ZeroOrOne(reg.into(), greedy)
     }
 
-    /// Like a `+` in regex. Build regex that matches underlying regex one or more.
-    pub fn repeat1(reg: Self) -> Self {
-        Regex::Repeat1(reg.into())
+    /// Like a `+`, `+?` in regex. Build regex that matches underlying regex one or more.
+    pub fn repeat1(reg: Self, greedy: bool) -> Self {
+        Regex::Repeat1(reg.into(), greedy)
     }
 
-    /// Like a `*` in regex. Build regex that matches underlying regex zero or more.
-    pub fn repeat0(reg: Self) -> Self {
-        Regex::Repeat0(reg.into())
+    /// Like a `*`, `*?` in regex. Build regex that matches underlying regex zero or more.
+    pub fn repeat0(reg: Self, greedy: bool) -> Self {
+        Regex::Repeat0(reg.into(), greedy)
     }
 
     /// Like a `{n}` in regex. Build regex that matches underlying regex N-times.
@@ -110,14 +138,14 @@ impl<T: 'static> Regex<T> {
         Regex::RepeatN(reg.into(), n)
     }
 
-    /// Like a `{n,}` in regex. Build regex that matches underlying regex N-times or more.
-    pub fn repeat_n_or_more(reg: Self, n: usize) -> Self {
-        Regex::RepeatMinMax(reg.into(), n, None)
+    /// Like a `{n,}`, `{n,}?` in regex. Build regex that matches underlying regex N-times or more.
+    pub fn repeat_n_or_more(reg: Self, n: usize, greedy: bool) -> Self {
+        Regex::RepeatMinMax(reg.into(), n, None, greedy)
     }
 
-    /// Like a `{n,m}` in regex. Build regex that matches underlying regex n or n + 1 or ... or m times.
-    pub fn repeat_min_max(reg: Self, n: usize, m: usize) -> Self {
-        Regex::RepeatMinMax(reg.into(), n, Some(m))
+    /// Like a `{n,m}`, `{n,m}?` in regex. Build regex that matches underlying regex n or n + 1 or ... or m times.
+    pub fn repeat_min_max(reg: Self, n: usize, m: usize, greedy: bool) -> Self {
+        Regex::RepeatMinMax(reg.into(), n, Some(m), greedy)
     }
 
     /// Like a `RS` in regex. Build regex that R followd by S.
@@ -130,7 +158,7 @@ impl<T: 'static> Regex<T> {
         Regex::Or(r.into(), s.into())
     }
 
-    /// Like a `(R)` in regex. Build regex that R regex in a group.
+    /// Like a `(R)` in regex. Numbered capturing group (submatch).
     pub fn group(r: Self) -> Self {
         Regex::Group(r.into())
     }
@@ -161,7 +189,5 @@ impl<T: 'static> Regex<T> {
 
     pub fn compile(&self) -> impl CompiledRegex<T> {
         CompiledRegexInVm::compile(self)
-        //CompiledRegexInNFA::compile(self)
-        //CompiledRegexInDFA::compile(self)
     }
 }

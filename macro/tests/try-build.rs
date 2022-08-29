@@ -11,4 +11,5 @@ fn test_builds() {
     t.pass("tests/try-build-case/zero_or_one.rs");
     t.pass("tests/try-build-case/n_repeat.rs");
     t.pass("tests/try-build-case/complex.rs");
+    t.pass("tests/try-build-case/non-greedy.rs");
 }

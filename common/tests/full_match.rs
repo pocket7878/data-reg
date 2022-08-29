@@ -33,7 +33,7 @@ fn match_seq() {
 
 #[test]
 fn match_repeat0() {
-    let reg = Regex::repeat0(Regex::is(1)).compile();
+    let reg = Regex::repeat0(Regex::is(1), true).compile();
     assert!(reg.is_full_match(&[]));
     assert!(reg.is_full_match(&[1]));
     assert!(reg.is_full_match(&[1, 1]));
@@ -41,7 +41,7 @@ fn match_repeat0() {
 
 #[test]
 fn match_repeat1() {
-    let reg = Regex::repeat1(Regex::is(1)).compile();
+    let reg = Regex::repeat1(Regex::is(1), true).compile();
     assert!(!reg.is_full_match(&[]));
     assert!(reg.is_full_match(&[1]));
     assert!(reg.is_full_match(&[1, 1]));
@@ -59,7 +59,7 @@ fn match_repeat_n() {
 
 #[test]
 fn match_repeat_n_or_more() {
-    let reg = Regex::repeat_n_or_more(Regex::is(1), 3).compile();
+    let reg = Regex::repeat_n_or_more(Regex::is(1), 3, true).compile();
     assert!(!reg.is_full_match(&[1, 1]));
     assert!(reg.is_full_match(&[1, 1, 1]));
     assert!(reg.is_full_match(&[1, 1, 1, 1]));
@@ -69,7 +69,7 @@ fn match_repeat_n_or_more() {
 
 #[test]
 fn match_repeat_min_max() {
-    let reg = Regex::repeat_min_max(Regex::is(1), 3, 5).compile();
+    let reg = Regex::repeat_min_max(Regex::is(1), 3, 5, true).compile();
     assert!(!reg.is_full_match(&[1, 1]));
     assert!(reg.is_full_match(&[1, 1, 1]));
     assert!(reg.is_full_match(&[1, 1, 1, 1]));
@@ -79,7 +79,7 @@ fn match_repeat_min_max() {
 
 #[test]
 fn match_repeat_zero_to_n_times() {
-    let reg = Regex::repeat_min_max(Regex::is(1), 0, 2).compile();
+    let reg = Regex::repeat_min_max(Regex::is(1), 0, 2, true).compile();
     assert!(reg.is_full_match(&[]));
     assert!(reg.is_full_match(&[1]));
     assert!(reg.is_full_match(&[1, 1]));
@@ -88,7 +88,7 @@ fn match_repeat_zero_to_n_times() {
 
 #[test]
 fn match_zero_or_one() {
-    let reg = Regex::zero_or_one(Regex::is(1)).compile();
+    let reg = Regex::zero_or_one(Regex::is(1), true).compile();
     assert!(reg.is_full_match(&[]));
     assert!(reg.is_full_match(&[1]));
     assert!(!reg.is_full_match(&[1, 1]));
@@ -126,10 +126,10 @@ fn match_complex() {
     let is_fizz_buzz = |x: &i32| x % 15 == 0;
     let reg = Regex::concat(
         Regex::satisfy(is_fizz),
-        Regex::repeat1(Regex::concat(
-            Regex::satisfy(is_buzz),
-            Regex::satisfy(is_fizz_buzz),
-        )),
+        Regex::repeat1(
+            Regex::concat(Regex::satisfy(is_buzz), Regex::satisfy(is_fizz_buzz)),
+            true,
+        ),
     )
     .compile();
     assert!(!reg.is_full_match(&[1, 2, 3]));

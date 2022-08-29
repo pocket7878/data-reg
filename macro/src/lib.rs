@@ -51,22 +51,28 @@ impl RegexMacroInput {
         base_regex_expr: proc_macro2::TokenStream,
     ) -> Result<proc_macro2::TokenStream> {
         if input.parse::<syn::token::Question>().is_ok() {
-            Ok(syn::parse_quote!(Regex::zero_or_one(#base_regex_expr)))
+            let greedy = input.parse::<syn::token::Question>().is_err();
+            Ok(syn::parse_quote!(Regex::zero_or_one(#base_regex_expr, #greedy)))
         } else if input.parse::<syn::token::Star>().is_ok() {
-            Ok(syn::parse_quote!(Regex::repeat0(#base_regex_expr)))
+            let greedy = input.parse::<syn::token::Question>().is_err();
+            Ok(syn::parse_quote!(Regex::repeat0(#base_regex_expr, #greedy)))
         } else if input.parse::<syn::Token![+]>().is_ok() {
-            Ok(syn::parse_quote!(Regex::repeat1(#base_regex_expr)))
+            let greedy = input.parse::<syn::token::Question>().is_err();
+            Ok(syn::parse_quote!(Regex::repeat1(#base_regex_expr, #greedy)))
         } else if input.peek(syn::token::Brace) {
             let braced_content;
             braced!(braced_content in input);
+            let greedy = input.parse::<syn::token::Question>().is_err();
             if let Ok(n_lit) = braced_content.parse::<syn::LitInt>() {
                 if braced_content.parse::<syn::token::Comma>().is_ok() {
                     if let Ok(m_lit) = braced_content.parse::<syn::LitInt>() {
                         Ok(
-                            syn::parse_quote!(Regex::repeat_min_max(#base_regex_expr, #n_lit, #m_lit)),
+                            syn::parse_quote!(Regex::repeat_min_max(#base_regex_expr, #n_lit, #m_lit, #greedy)),
                         )
                     } else if braced_content.is_empty() {
-                        Ok(syn::parse_quote!(Regex::repeat_n_or_more(#base_regex_expr, #n_lit)))
+                        Ok(
+                            syn::parse_quote!(Regex::repeat_n_or_more(#base_regex_expr, #n_lit, #greedy)),
+                        )
                     } else {
                         Err(syn::Error::new(
                             braced_content.span(),
