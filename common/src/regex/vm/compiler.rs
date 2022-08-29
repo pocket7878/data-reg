@@ -12,13 +12,10 @@ pub struct CompiledRegexInVm<I> {
 impl<I> CompiledRegexInVm<I> {
     pub fn compile(reg: &Regex<I>) -> Self {
         let insts = compile_regex_to_vm_insts(reg);
-        let inst = Self {
+
+        Self {
             insts: Rc::new(insts),
-        };
-
-        inst.dump_insts();
-
-        inst
+        }
     }
 
     #[allow(dead_code)]
@@ -43,7 +40,7 @@ impl<I> CompiledRegex<I> for CompiledRegexInVm<I> {
                 if let Some(start) = saved.get(&(i * 2)) {
                     if let Some(end) = saved.get(&(i * 2 + 1)) {
                         captures.push(Capture {
-                            input: input,
+                            input,
                             range: *start..*end,
                         });
                     } else {

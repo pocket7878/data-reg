@@ -12,7 +12,7 @@ pub struct Capture<'a, I> {
 
 impl<'a, I> Capture<'a, I> {
     pub fn values(&self) -> &'a [I] {
-        return &self.input[self.range.clone()];
+        &self.input[self.range.clone()]
     }
 }
 
