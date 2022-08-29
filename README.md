@@ -73,9 +73,9 @@ assert_eq!(&capture_1.values, &vec![&3, &5, &7]);
 | Syntax | Description |
 |:--|:--|
 | `[function_name]` | Match any values that satisfied given function. |
-| <code>[&#124;x&#124; *x == 1]</code> | Match any values that satisfied given closure. |
+| `[\|x\| *x == 1]` | Match any values that satisfied given closure. |
 | `[^function_name]` | Match any values that not satisfied given function. |
-| <code>[&#94;&#124;x&#124; *x == 1]</code> | Match any values that not satisfied given closure. |
+| `[^\|x\| *x == 1]` | Match any values that not satisfied given closure. |
 | `RS` | `R` followed by `S` |
 | <code>R&#124;S</code> | `R` or `S` (prefer `R`) |
 | `R?` | zero or one `R`, prefer one |
