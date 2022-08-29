@@ -46,3 +46,26 @@ assert!(!reg.is_full_match(&vec![1, 2, 3]));
 assert!(reg.is_full_match(&vec![3, 5, 15]));
 assert!(reg.is_full_match(&vec![6, 10, 15, 10, 30]));
 ```
+
+Example capture:
+
+```rust
+use vec_reg::{Regex, CompiledRegex, vec_reg};
+
+let is_even = |x: &i32| x % 2 == 0;
+let is_odd = |x: &i32| x % 2 == 1;
+let reg = vec_reg!(([is_even]+)[is_even]([is_odd]+)).compile();
+let captures = reg.captures(&[2, 4, 6, 3, 5, 7]);
+assert!(captures.is_some());
+assert_eq!(captures.as_ref().unwrap().len(), 2);
+
+let capture_0 = &captures.as_ref().unwrap()[0];
+assert_eq!(capture_0.start, 0);
+assert_eq!(capture_0.end, 1);
+assert_eq!(&capture_0.values, &vec![&2, &4]);
+
+let capture_1 = &captures.as_ref().unwrap()[1];
+assert_eq!(capture_1.start, 3);
+assert_eq!(capture_1.end, 5);
+assert_eq!(&capture_1.values, &vec![&3, &5, &7]);
+```
