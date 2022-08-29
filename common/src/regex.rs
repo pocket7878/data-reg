@@ -1,5 +1,3 @@
-mod dfa;
-mod nfa;
 pub mod vm;
 
 use std::rc::Rc;
