@@ -19,10 +19,6 @@ vec-reg-common = { version = "0.3.0", path = "../common" }
 [lib]
 proc-macro = true
 
-[[test]]
-name = "tests"
-path = "tests/tests.rs"
-
 [dev-dependencies]
 trybuild = "1.0"
 
