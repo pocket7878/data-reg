@@ -1,8 +1,9 @@
+use core::panic;
 use std::rc::Rc;
 
-use crate::{CompiledRegex, Regex};
+use crate::{Capture, CompiledRegex, Regex};
 
-use super::inst::{Inst, PC, GroupIndex};
+use super::inst::{GroupIndex, Inst, PC};
 
 pub struct CompiledRegexInVm<I> {
     insts: Rc<Vec<Inst<I>>>,
@@ -27,21 +28,32 @@ impl<I> CompiledRegexInVm<I> {
 
 impl<I> CompiledRegex<I> for CompiledRegexInVm<I> {
     fn is_full_match(&self, input: &[I]) -> bool {
+        super::runner::run_vm(self.insts.clone(), input, true).is_some()
+    }
+
+    fn captures<'a>(&self, input: &'a [I]) -> Option<Vec<Capture<'a, I>>> {
         if let Some(matched_thread) = super::runner::run_vm(self.insts.clone(), input, true) {
             let saved = matched_thread.saved;
-            let mut sub_matches = vec![];
+            let mut captures = vec![];
             for i in 1.. {
-                match (saved.get(&(i*2)), saved.get(&(i * 2 + 1))) {
-                    (Some(start), Some(end)) => {
-                        sub_matches.push((start, end - 1));
+                if let Some(start) = saved.get(&(i * 2)) {
+                    if let Some(end) = saved.get(&(i * 2 + 1)) {
+                        let values = input.iter().take(*end).skip(*start).collect();
+                        captures.push(Capture {
+                            start: *start,
+                            end: *end - 1,
+                            values,
+                        });
+                    } else {
+                        panic!("Unexpected asymmetric saved position.")
                     }
-                    _ => break,
+                } else {
+                    break;
                 }
             }
-            eprintln!("Submatches: {:?}", sub_matches);
-            return true;
+            Some(captures)
         } else {
-            return false;
+            None
         }
     }
 }
@@ -53,7 +65,11 @@ pub fn compile_regex_to_vm_insts<I>(reg: &Regex<I>) -> Vec<Inst<I>> {
     insts
 }
 
-fn _compile_regex<I>(reg: &Regex<I>, start_pc: PC, next_group_index: GroupIndex) -> (Vec<Inst<I>>, PC, GroupIndex) {
+fn _compile_regex<I>(
+    reg: &Regex<I>,
+    start_pc: PC,
+    next_group_index: GroupIndex,
+) -> (Vec<Inst<I>>, PC, GroupIndex) {
     let mut insts = vec![];
     let end_pc;
     let mut new_next_group_index = next_group_index;
@@ -67,8 +83,10 @@ fn _compile_regex<I>(reg: &Regex<I>, start_pc: PC, next_group_index: GroupIndex)
             end_pc = start_pc;
         }
         Regex::Concat(r, s) => {
-            let (r_insts, r_end_pc, r_next_group_index) = _compile_regex(r, start_pc, next_group_index);
-            let (s_insts, s_end_pc, s_next_group_index) = _compile_regex(s, r_end_pc + 1, r_next_group_index);
+            let (r_insts, r_end_pc, r_next_group_index) =
+                _compile_regex(r, start_pc, next_group_index);
+            let (s_insts, s_end_pc, s_next_group_index) =
+                _compile_regex(s, r_end_pc + 1, r_next_group_index);
             insts.extend(r_insts);
             insts.extend(s_insts);
             end_pc = s_end_pc;
@@ -80,7 +98,8 @@ fn _compile_regex<I>(reg: &Regex<I>, start_pc: PC, next_group_index: GroupIndex)
 
             insts.push(Inst::Save(open_save_index));
             let r_start_pc = start_pc + 1;
-            let (r_insts, r_end_pc, r_next_group_index) = _compile_regex(r, r_start_pc, next_group_index + 1);
+            let (r_insts, r_end_pc, r_next_group_index) =
+                _compile_regex(r, r_start_pc, next_group_index + 1);
             insts.extend(r_insts);
             insts.push(Inst::Save(close_save_index));
             end_pc = r_end_pc + 1;
@@ -88,10 +107,12 @@ fn _compile_regex<I>(reg: &Regex<I>, start_pc: PC, next_group_index: GroupIndex)
         }
         Regex::Or(r, s) => {
             let r_start_pc = start_pc + 1;
-            let (r_insts, r_end_pc, r_next_group_index) = _compile_regex(r, r_start_pc, next_group_index);
+            let (r_insts, r_end_pc, r_next_group_index) =
+                _compile_regex(r, r_start_pc, next_group_index);
             let jmp_inst_pc = r_end_pc + 1;
             let s_start_pc = jmp_inst_pc + 1;
-            let (s_insts, s_end_pc, s_next_group_index) = _compile_regex(s, s_start_pc, r_next_group_index);
+            let (s_insts, s_end_pc, s_next_group_index) =
+                _compile_regex(s, s_start_pc, r_next_group_index);
             end_pc = s_end_pc;
 
             insts.push(Inst::Split(r_start_pc, s_start_pc));
@@ -102,7 +123,8 @@ fn _compile_regex<I>(reg: &Regex<I>, start_pc: PC, next_group_index: GroupIndex)
         }
         Regex::ZeroOrOne(r) => {
             let r_start_pc = start_pc + 1;
-            let (r_insts, r_end_pc, r_next_group_index) = _compile_regex(r, r_start_pc, next_group_index);
+            let (r_insts, r_end_pc, r_next_group_index) =
+                _compile_regex(r, r_start_pc, next_group_index);
             end_pc = r_end_pc;
 
             insts.push(Inst::Split(r_start_pc, r_end_pc + 1));
@@ -111,7 +133,8 @@ fn _compile_regex<I>(reg: &Regex<I>, start_pc: PC, next_group_index: GroupIndex)
         }
         Regex::Repeat0(r) => {
             let r_start_pc = start_pc + 1;
-            let (r_insts, r_end_pc, r_next_group_index) = _compile_regex(r, r_start_pc, next_group_index);
+            let (r_insts, r_end_pc, r_next_group_index) =
+                _compile_regex(r, r_start_pc, next_group_index);
             let jmp_inst_pc = r_end_pc + 1;
             end_pc = jmp_inst_pc;
 
@@ -121,7 +144,8 @@ fn _compile_regex<I>(reg: &Regex<I>, start_pc: PC, next_group_index: GroupIndex)
             new_next_group_index = r_next_group_index;
         }
         Regex::Repeat1(r) => {
-            let (r_insts, r_end_pc, r_next_group_index) = _compile_regex(r, start_pc, next_group_index);
+            let (r_insts, r_end_pc, r_next_group_index) =
+                _compile_regex(r, start_pc, next_group_index);
             end_pc = r_end_pc + 1;
 
             insts.extend(r_insts);
@@ -130,14 +154,16 @@ fn _compile_regex<I>(reg: &Regex<I>, start_pc: PC, next_group_index: GroupIndex)
         }
         Regex::RepeatN(r, n) => {
             let expanded_r = expand_repeat_n(r.clone(), *n);
-            let (r_insts, r_end_pc, r_next_group_index) = _compile_regex(&expanded_r, start_pc, next_group_index);
+            let (r_insts, r_end_pc, r_next_group_index) =
+                _compile_regex(&expanded_r, start_pc, next_group_index);
             insts.extend(r_insts);
             end_pc = r_end_pc;
             new_next_group_index = r_next_group_index
         }
         Regex::RepeatMinMax(r, n, m) => {
             let expanded_r = expand_repeat_min_max(r.clone(), *n, m);
-            let (r_insts, r_end_pc, r_next_group_index) = _compile_regex(&expanded_r, start_pc, next_group_index);
+            let (r_insts, r_end_pc, r_next_group_index) =
+                _compile_regex(&expanded_r, start_pc, next_group_index);
             insts.extend(r_insts);
             end_pc = r_end_pc;
             new_next_group_index = r_next_group_index;

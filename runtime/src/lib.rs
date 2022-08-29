@@ -30,3 +30,6 @@
 
 pub use vec_reg_common::{CompiledRegex, Regex};
 pub use vec_reg_macro::vec_reg;
+
+#[cfg(doctest)]
+doc_comment::doctest!("../../README.md");
