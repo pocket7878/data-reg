@@ -6,8 +6,14 @@ pub use regex::Regex;
 
 #[derive(Debug)]
 pub struct Capture<'a, I> {
+    input: &'a [I],
     pub range: Range<usize>,
-    pub values: Vec<&'a I>,
+}
+
+impl<'a, I> Capture<'a, I> {
+    pub fn values(&self) -> &'a [I] {
+        return &self.input[self.range.clone()];
+    }
 }
 
 pub trait CompiledRegex<I> {

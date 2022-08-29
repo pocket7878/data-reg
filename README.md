@@ -61,11 +61,11 @@ assert_eq!(captures.as_ref().unwrap().len(), 2);
 
 let capture_0 = &captures.as_ref().unwrap()[0];
 assert_eq!(capture_0.range, 0..2);
-assert_eq!(&capture_0.values, &vec![&2, &4]);
+assert_eq!(capture_0.values(), &[2, 4]);
 
 let capture_1 = &captures.as_ref().unwrap()[1];
 assert_eq!(capture_1.range, 3..6);
-assert_eq!(&capture_1.values, &vec![&3, &5, &7]);
+assert_eq!(capture_1.values(), &[3, 5, 7]);
 ```
 
 ## Supported Syntax

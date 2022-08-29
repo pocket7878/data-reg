@@ -42,10 +42,9 @@ impl<I> CompiledRegex<I> for CompiledRegexInVm<I> {
             for i in 1.. {
                 if let Some(start) = saved.get(&(i * 2)) {
                     if let Some(end) = saved.get(&(i * 2 + 1)) {
-                        let values = input.iter().take(*end).skip(*start).collect();
                         captures.push(Capture {
+                            input: input,
                             range: *start..*end,
-                            values,
                         });
                     } else {
                         panic!("Unexpected asymmetric saved position.")
