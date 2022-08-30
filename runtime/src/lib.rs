@@ -21,6 +21,8 @@
 //! | `[^function_name]` | Match any values that not satisfied given function. |
 //! | <code>[&#94;&#124;x&#124; *x == 1]</code> | Match any values that not satisfied given closure. |
 //! | `.` | Match any values. |
+//! | `(R)` | numbered capturing group (submatch) |
+//! | `(?:R)` | non-capturing group |
 //! | `RS` | `R` followed by `S` |
 //! | <code>R&#124;S</code> | `R` or `S` (prefer `R`) |
 //! | `R?` | zero or one `R`, prefer one |
@@ -36,7 +38,7 @@
 //! | `R{n}` | exactly `n` `R` |
 //! | `R{n}?` | exactly `n` `R` |
 
-pub use vec_reg_common::{CompiledRegex, Regex};
+pub use vec_reg_common::{Capture, CompiledRegex, Regex};
 pub use vec_reg_macro::vec_reg;
 
 #[cfg(doctest)]

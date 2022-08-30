@@ -15,6 +15,8 @@ pub enum Regex<T> {
     Concat(Rc<Regex<T>>, Rc<Regex<T>>),
     /// Like a `(R)` in regex. Numbered capturing group (submatch).
     Group(Rc<Regex<T>>),
+    /// Like a `(?:R)` in regex. Numbered non-capturing group.
+    NonCapturingGroup(Rc<Regex<T>>),
     /// Like a `R|S` in regex. Regex alternation.
     Or(Rc<Regex<T>>, Rc<Regex<T>>),
     /// Like a `?`, `??` in regex. Regex zero or one.
@@ -36,6 +38,7 @@ impl<T> std::fmt::Debug for Regex<T> {
             Regex::NotSatisfy(_) => f.debug_tuple("NotSatisfy").field(&"<fn>").finish(),
             Regex::Concat(l, r) => f.debug_tuple("Concat").field(l).field(r).finish(),
             Regex::Group(r) => f.debug_tuple("Group").field(r).finish(),
+            Regex::NonCapturingGroup(r) => f.debug_tuple("NonCaptureGroup").field(r).finish(),
             Regex::Or(l, r) => f.debug_tuple("Or").field(l).field(r).finish(),
             Regex::Repeat0(r, greedy) => f.debug_tuple("Repeat0").field(r).field(greedy).finish(),
             Regex::ZeroOrOne(r, greedy) => {
@@ -61,6 +64,7 @@ impl<T> std::fmt::Display for Regex<T> {
             Regex::NotSatisfy(_) => write!(f, "[^ <fn>]"),
             Regex::Concat(l, r) => write!(f, "{}{}", l, r),
             Regex::Group(r) => write!(f, "({})", r),
+            Regex::NonCapturingGroup(r) => write!(f, "(?:{})", r),
             Regex::Or(l, r) => write!(f, "{}|{}", l, r),
             Regex::Repeat0(r, greedy) => {
                 write!(f, "{}*", r)?;
@@ -161,6 +165,11 @@ impl<T: 'static> Regex<T> {
     /// Like a `(R)` in regex. Numbered capturing group (submatch).
     pub fn group(r: Self) -> Self {
         Regex::Group(r.into())
+    }
+
+    /// Like a `(?:R)` in regex. Numbered capturing group (submatch).
+    pub fn non_capturing_group(r: Self) -> Self {
+        Regex::NonCapturingGroup(r.into())
     }
 
     /// Build regex that matches given value.
