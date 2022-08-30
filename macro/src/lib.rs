@@ -98,8 +98,18 @@ impl RegexMacroInput {
         } else if input.peek(syn::token::Paren) {
             let parend_content;
             parenthesized!(parend_content in input);
+            let mut capturing = true;
+            if parend_content.parse::<syn::token::Question>().is_ok() && parend_content.parse::<syn::token::Colon>().is_ok() {
+                capturing = false;
+            }
             match Self::parse_expr(&parend_content) {
-                Ok(expr) => Ok(syn::parse_quote!(Regex::group(#expr))),
+                Ok(expr) => {
+                    if capturing {
+                        Ok(syn::parse_quote!(Regex::group(#expr)))
+                    } else {
+                        Ok(syn::parse_quote!(Regex::non_capturing_group(#expr)))
+                    }
+                }
                 Err(error) => Err(error),
             }
         } else {
