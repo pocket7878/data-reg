@@ -104,6 +104,14 @@ fn _compile_regex<I>(
             end_pc = r_end_pc + 1;
             new_next_group_index = r_next_group_index;
         }
+        Regex::NonCapturingGroup(r) => {
+            let r_start_pc = start_pc;
+            let (r_insts, r_end_pc, r_next_group_index) =
+                _compile_regex(r, r_start_pc, next_group_index);
+            insts.extend(r_insts);
+            end_pc = r_end_pc;
+            new_next_group_index = r_next_group_index;
+        }
         Regex::Or(r, s) => {
             let r_start_pc = start_pc + 1;
             let (r_insts, r_end_pc, r_next_group_index) =

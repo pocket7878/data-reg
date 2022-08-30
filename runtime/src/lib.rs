@@ -36,7 +36,7 @@
 //! | `R{n}` | exactly `n` `R` |
 //! | `R{n}?` | exactly `n` `R` |
 
-pub use vec_reg_common::{CompiledRegex, Regex};
+pub use vec_reg_common::{CompiledRegex, Regex, Capture};
 pub use vec_reg_macro::vec_reg;
 
 #[cfg(doctest)]
