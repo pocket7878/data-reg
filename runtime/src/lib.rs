@@ -20,6 +20,7 @@
 //! | <code>[&#124;x&#124; *x == 1]</code> | Match any values that satisfied given closure. |
 //! | `[^function_name]` | Match any values that not satisfied given function. |
 //! | <code>[&#94;&#124;x&#124; *x == 1]</code> | Match any values that not satisfied given closure. |
+//! | `.` | Match any values. |
 //! | `RS` | `R` followed by `S` |
 //! | <code>R&#124;S</code> | `R` or `S` (prefer `R`) |
 //! | `R?` | zero or one `R`, prefer one |

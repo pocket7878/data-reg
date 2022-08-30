@@ -76,6 +76,7 @@ assert_eq!(capture_1.values(), &[3, 5, 7]);
 | `[\|x\| *x == 1]` | Match any values that satisfied given closure. |
 | `[^function_name]` | Match any values that not satisfied given function. |
 | `[^\|x\| *x == 1]` | Match any values that not satisfied given closure. |
+| `.` | Match any values. |
 | `RS` | `R` followed by `S` |
 | <code>R&#124;S</code> | `R` or `S` (prefer `R`) |
 | `R?` | zero or one `R`, prefer one |
