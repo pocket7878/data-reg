@@ -2,15 +2,15 @@
 name = "vec-reg"
 description = "Generalized regex like pattern matching for vector"
 readme = "../README.md"
-version = "0.5.1"
+version = "0.6.0"
 edition = "2021"
 authors = ["Masato Sogame <poketo7878@gmail.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/pocket7878/vec-reg"
 
 [dependencies]
-vec-reg-macro = { version = "0.5.0", path = "../macro" }
-vec-reg-common = { version = "0.5.0", path = "../common" }
+vec-reg-macro = { version = "0.6.0", path = "../macro" }
+vec-reg-common = { version = "0.6.0", path = "../common" }
 
 [dev-dependencies]
 doc-comment = "0.3.3"
