@@ -1,7 +1,7 @@
 use core::panic;
 use std::rc::Rc;
 
-use crate::{Capture, CompiledRegex, Regex};
+use crate::{CaptureLocation, Captures, CompiledRegex, Regex};
 
 use super::inst::{GroupIndex, Inst, PC};
 
@@ -32,16 +32,21 @@ impl<I> CompiledRegex<I> for CompiledRegexInVm<I> {
         super::runner::run_vm(self.insts.clone(), input, true).is_some()
     }
 
-    fn captures<'a>(&self, input: &'a [I]) -> Option<Vec<Capture<'a, I>>> {
+    fn captures<'a>(&self, input: &'a [I]) -> Option<Captures<'a, I>> {
         if let Some(matched_thread) = super::runner::run_vm(self.insts.clone(), input, true) {
             let saved = matched_thread.saved;
-            let mut captures = vec![];
+            let mut capture_locations = vec![];
+            // 0th capture is always correspond to entire match
+            capture_locations.push(CaptureLocation {
+                start: 0,
+                end: input.len(),
+            });
             for i in 1.. {
                 if let Some(start) = saved.get(&(i * 2)) {
                     if let Some(end) = saved.get(&(i * 2 + 1)) {
-                        captures.push(Capture {
-                            input,
-                            range: *start..*end,
+                        capture_locations.push(CaptureLocation {
+                            start: *start,
+                            end: *end,
                         });
                     } else {
                         panic!("Unexpected asymmetric saved position.")
@@ -50,7 +55,11 @@ impl<I> CompiledRegex<I> for CompiledRegexInVm<I> {
                     break;
                 }
             }
-            Some(captures)
+            Some(Captures {
+                input,
+                capture_locations,
+                named_capture_index: matched_thread.named_capture_index,
+            })
         } else {
             None
         }
@@ -92,15 +101,22 @@ fn _compile_regex<I>(
             new_next_group_index = s_next_group_index;
         }
         Regex::Group(r) => {
-            let open_save_index = next_group_index * 2;
-            let close_save_index = next_group_index * 2 + 1;
-
-            insts.push(Inst::Save(open_save_index));
+            insts.push(Inst::SaveOpen(next_group_index));
             let r_start_pc = start_pc + 1;
             let (r_insts, r_end_pc, r_next_group_index) =
                 _compile_regex(r, r_start_pc, next_group_index + 1);
             insts.extend(r_insts);
-            insts.push(Inst::Save(close_save_index));
+            insts.push(Inst::SaveClose(next_group_index));
+            end_pc = r_end_pc + 1;
+            new_next_group_index = r_next_group_index;
+        }
+        Regex::NamedGroup(name, r) => {
+            insts.push(Inst::SaveNamedOpen(name.to_owned(), next_group_index));
+            let r_start_pc = start_pc + 1;
+            let (r_insts, r_end_pc, r_next_group_index) =
+                _compile_regex(r, r_start_pc, next_group_index + 1);
+            insts.extend(r_insts);
+            insts.push(Inst::SaveNamedClose(name.to_owned(), next_group_index));
             end_pc = r_end_pc + 1;
             new_next_group_index = r_next_group_index;
         }

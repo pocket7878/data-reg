@@ -57,15 +57,14 @@ let is_odd = |x: &i32| x % 2 == 1;
 let reg = vec_reg!(([is_even]+)[is_even]([is_odd]+)).compile();
 let captures = reg.captures(&[2, 4, 6, 3, 5, 7]);
 assert!(captures.is_some());
-assert_eq!(captures.as_ref().unwrap().len(), 2);
 
-let capture_0 = &captures.as_ref().unwrap()[0];
-assert_eq!(capture_0.range, 0..2);
-assert_eq!(capture_0.values(), &[2, 4]);
+let capture_1 = &captures.as_ref().unwrap().get(1).unwrap();
+assert_eq!(capture_1.range(), 0..2);
+assert_eq!(capture_1.values(), &[2, 4]);
 
-let capture_1 = &captures.as_ref().unwrap()[1];
-assert_eq!(capture_1.range, 3..6);
-assert_eq!(capture_1.values(), &[3, 5, 7]);
+let capture_2 = &captures.as_ref().unwrap().get(2).unwrap();
+assert_eq!(capture_2.range(), 3..6);
+assert_eq!(capture_2.values(), &[3, 5, 7]);
 ```
 
 ## Supported Syntax
@@ -79,8 +78,9 @@ assert_eq!(capture_1.values(), &[3, 5, 7]);
 | `.` | Match any values. |
 | `(R)` | numbered capturing group (submatch) |
 | `(?:R)` | non-capturing group |
+| `(?P<"name">R)` | named & numbered capturing group (submatch) |
 | `RS` | `R` followed by `S` |
-| <code>R&#124;S</code> | `R` or `S` (prefer `R`) |
+| `R\|S` | `R` or `S` (prefer `R`) |
 | `R?` | zero or one `R`, prefer one |
 | `R??` | zero or one `R`, prefer zero |
 | `R*` | zero or more `R`, prefer more |
