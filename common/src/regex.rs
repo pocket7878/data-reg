@@ -7,6 +7,10 @@ use super::CompiledRegex;
 
 #[derive(Clone)]
 pub enum Regex<T> {
+    /// Like a '^' in ragex. Regex that matches the beginning of the input.
+    Begin,
+    /// Like a '$' in ragex. Regex that matches the end of the input.
+    End,
     /// Like a `[character class]` in regex. Regex that matches any values that satisfy the given predicate.
     Satisfy(Rc<dyn Fn(&T) -> bool>),
     /// Like a `[^character class]` in regex. Regex that matches any values that not satisfy the given predicate.
@@ -36,6 +40,8 @@ pub enum Regex<T> {
 impl<T> std::fmt::Debug for Regex<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Regex::Begin => f.write_str("Begin"),
+            Regex::End => f.write_str("End"),
             Regex::Satisfy(_) => f.debug_tuple("Satisfy").field(&"<fn>").finish(),
             Regex::NotSatisfy(_) => f.debug_tuple("NotSatisfy").field(&"<fn>").finish(),
             Regex::Concat(l, r) => f.debug_tuple("Concat").field(l).field(r).finish(),
@@ -63,6 +69,8 @@ impl<T> std::fmt::Debug for Regex<T> {
 impl<T> std::fmt::Display for Regex<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Regex::Begin => write!(f, "^"),
+            Regex::End => write!(f, "$"),
             Regex::Satisfy(_) => write!(f, "[<fn>]"),
             Regex::NotSatisfy(_) => write!(f, "[^ <fn>]"),
             Regex::Concat(l, r) => write!(f, "{}{}", l, r),
@@ -111,6 +119,14 @@ impl<T> std::fmt::Display for Regex<T> {
 }
 
 impl<T: 'static> Regex<T> {
+    /// Like a `^` in regex. Build regex that matches the begging of the input.
+    pub fn begin() -> Self {
+        Regex::Begin
+    }
+    /// Like a `$` in regex. Build regex that matches the end of the input.
+    pub fn end() -> Self {
+        Regex::End
+    }
     /// Like a `[character class]` in regex. Build regex that matches any value that satisfies the given predicate.
     pub fn satisfy(f: impl Fn(&T) -> bool + 'static) -> Self {
         Regex::Satisfy(Rc::new(f))
@@ -205,7 +221,7 @@ impl<T: 'static> Regex<T> {
         }
     }
 
-    pub fn compile(&self) -> impl CompiledRegex<T> {
+    pub fn compile(self) -> impl CompiledRegex<T> {
         CompiledRegexInVm::compile(self)
     }
 }

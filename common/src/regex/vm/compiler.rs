@@ -1,7 +1,7 @@
 use core::panic;
 use std::rc::Rc;
 
-use crate::{CaptureLocation, Captures, CompiledRegex, Regex};
+use crate::{CaptureLocation, Captures, CompiledRegex, Match, Regex};
 
 use super::inst::{GroupIndex, Inst, PC};
 
@@ -10,8 +10,22 @@ pub struct CompiledRegexInVm<I> {
 }
 
 impl<I> CompiledRegexInVm<I> {
-    pub fn compile(reg: &Regex<I>) -> Self {
-        let insts = compile_regex_to_vm_insts(reg);
+    pub fn compile(reg: Regex<I>) -> Self {
+        // Wrapping given regex R in `.*?(R).*?` to partial matching.
+        let full_match_regex = Regex::Concat(
+            Rc::new(Regex::Repeat0(
+                Rc::new(Regex::Satisfy(Rc::new(|_| true))),
+                false,
+            )),
+            Rc::new(Regex::Concat(
+                Rc::new(Regex::Group(reg.into())),
+                Rc::new(Regex::Repeat0(
+                    Rc::new(Regex::Satisfy(Rc::new(|_| true))),
+                    false,
+                )),
+            )),
+        );
+        let insts = compile_regex_to_vm_insts(&full_match_regex);
 
         Self {
             insts: Rc::new(insts),
@@ -28,20 +42,36 @@ impl<I> CompiledRegexInVm<I> {
 }
 
 impl<I> CompiledRegex<I> for CompiledRegexInVm<I> {
-    fn is_full_match(&self, input: &[I]) -> bool {
-        super::runner::run_vm(self.insts.clone(), input, true).is_some()
+    fn is_match(&self, input: &[I]) -> bool {
+        super::runner::run_vm(self.insts.clone(), input).is_some()
+    }
+
+    fn find<'a>(&self, input: &'a [I]) -> Option<Match<'a, I>> {
+        if let Some(matched_thread) = super::runner::run_vm(self.insts.clone(), input) {
+            let saved = matched_thread.saved;
+            if let Some(start) = saved.get(&0) {
+                if let Some(end) = saved.get(&1) {
+                    Some(Match {
+                        input,
+                        start: *start,
+                        end: *end,
+                    })
+                } else {
+                    panic!("Unexpected asymmetric saved position.")
+                }
+            } else {
+                panic!("Unexpected missing 0th capture.")
+            }
+        } else {
+            None
+        }
     }
 
     fn captures<'a>(&self, input: &'a [I]) -> Option<Captures<'a, I>> {
-        if let Some(matched_thread) = super::runner::run_vm(self.insts.clone(), input, true) {
+        if let Some(matched_thread) = super::runner::run_vm(self.insts.clone(), input) {
             let saved = matched_thread.saved;
             let mut capture_locations = vec![];
-            // 0th capture is always correspond to entire match
-            capture_locations.push(CaptureLocation {
-                start: 0,
-                end: input.len(),
-            });
-            for i in 1.. {
+            for i in 0.. {
                 if let Some(start) = saved.get(&(i * 2)) {
                     if let Some(end) = saved.get(&(i * 2 + 1)) {
                         capture_locations.push(CaptureLocation {
@@ -67,7 +97,7 @@ impl<I> CompiledRegex<I> for CompiledRegexInVm<I> {
 }
 
 pub fn compile_regex_to_vm_insts<I>(reg: &Regex<I>) -> Vec<Inst<I>> {
-    let (mut insts, _, _) = _compile_regex(reg, 0, 1);
+    let (mut insts, _, _) = _compile_regex(reg, 0, 0);
     insts.push(Inst::Match);
 
     insts
@@ -82,6 +112,14 @@ fn _compile_regex<I>(
     let end_pc;
     let mut new_next_group_index = next_group_index;
     match reg {
+        Regex::Begin => {
+            insts.push(Inst::Begin);
+            end_pc = start_pc;
+        }
+        Regex::End => {
+            insts.push(Inst::End);
+            end_pc = start_pc;
+        }
         Regex::Satisfy(f) => {
             insts.push(Inst::Check(f.clone()));
             end_pc = start_pc;

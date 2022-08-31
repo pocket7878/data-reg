@@ -7,9 +7,9 @@
 //!  let is_fizz = |x: &i32| x % 3 == 0;
 //!  let is_buzz = |x: &i32| x % 5 == 0;
 //!  let reg = vec_reg!([is_fizz]([is_buzz][|x| x % 15 == 0])+).compile();    
-//!  assert!(!reg.is_full_match(&vec![1, 2, 3]));
-//!  assert!(reg.is_full_match(&vec![3, 5, 15]));
-//!  assert!(reg.is_full_match(&vec![6, 10, 15, 10, 30]));
+//!  assert!(!reg.is_match(&vec![1, 2, 3]));
+//!  assert!(reg.is_match(&vec![3, 5, 15]));
+//!  assert!(reg.is_match(&vec![6, 10, 15, 10, 30]));
 //!  ```
 //!
 //! ## Supported Syntax
@@ -21,6 +21,8 @@
 //! | `[^function_name]` | Match any values that not satisfied given function. |
 //! | <code>[\^\|x\| *x == 1]</code> | Match any values that not satisfied given closure. |
 //! | `.` | Match any values. |
+//! | `^` | a beginning of input |
+//! | `$` | a end of input |
 //! | `(R)` | numbered capturing group (submatch) |
 //! | `(?:R)` | non-capturing group |
 //! | `(?P<"name">R)` | named & numbered capturing group (submatch) |
