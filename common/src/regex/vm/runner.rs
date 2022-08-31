@@ -58,14 +58,51 @@ impl<I> ThreadPool<I> {
         }
     }
 
-    pub fn add_thread(&mut self, th: Thread<I>, sp: SP) {
+    pub fn add_thread(&mut self, th: Thread<I>, sp: SP, end_of_input: bool) {
         if self.seen_pc.contains(&th.pc) {
             return;
         }
 
         match th.active_inst() {
+            Inst::Begin => {
+                if sp == 0 {
+                    self.add_thread(
+                        Thread {
+                            inst: th.inst.clone(),
+                            pc: th.pc + 1,
+                            saved: th.saved.clone(),
+                            named_capture_index: th.named_capture_index.clone(),
+                        },
+                        sp,
+                        end_of_input,
+                    );
+                }
+            }
+            Inst::End => {
+                if end_of_input {
+                    self.add_thread(
+                        Thread {
+                            inst: th.inst.clone(),
+                            pc: th.pc + 1,
+                            saved: th.saved.clone(),
+                            named_capture_index: th.named_capture_index.clone(),
+                        },
+                        sp,
+                        end_of_input,
+                    );
+                }
+            }
             Inst::Jmp(x) => {
-                self.add_thread(Thread { pc: *x, ..th }, sp);
+                self.add_thread(
+                    Thread {
+                        inst: th.inst.clone(),
+                        pc: *x,
+                        saved: th.saved.clone(),
+                        named_capture_index: th.named_capture_index.clone(),
+                    },
+                    sp,
+                    end_of_input,
+                );
             }
             Inst::Split(x, y) => {
                 self.add_thread(
@@ -76,6 +113,7 @@ impl<I> ThreadPool<I> {
                         named_capture_index: th.named_capture_index.clone(),
                     },
                     sp,
+                    end_of_input,
                 );
                 self.add_thread(
                     Thread {
@@ -85,6 +123,7 @@ impl<I> ThreadPool<I> {
                         named_capture_index: th.named_capture_index.clone(),
                     },
                     sp,
+                    end_of_input,
                 );
             }
             Inst::SaveOpen(group_index) => {
@@ -99,6 +138,7 @@ impl<I> ThreadPool<I> {
                         named_capture_index: th.named_capture_index.clone(),
                     },
                     sp,
+                    end_of_input,
                 );
             }
             Inst::SaveClose(group_index) => {
@@ -113,6 +153,7 @@ impl<I> ThreadPool<I> {
                         named_capture_index: th.named_capture_index.clone(),
                     },
                     sp,
+                    end_of_input,
                 );
             }
             Inst::SaveNamedOpen(name, group_index) => {
@@ -129,6 +170,7 @@ impl<I> ThreadPool<I> {
                         inst: th.inst.clone(),
                     },
                     sp,
+                    end_of_input,
                 );
             }
             Inst::SaveNamedClose(name, group_index) => {
@@ -145,6 +187,7 @@ impl<I> ThreadPool<I> {
                         inst: th.inst.clone(),
                     },
                     sp,
+                    end_of_input,
                 );
             }
             _ => {
@@ -155,8 +198,10 @@ impl<I> ThreadPool<I> {
     }
 }
 
-pub fn run_vm<I>(insts: Rc<Vec<Inst<I>>>, input: &[I], full_match: bool) -> Option<Thread<I>> {
+pub fn run_vm<I>(insts: Rc<Vec<Inst<I>>>, input: &[I]) -> Option<Thread<I>> {
     let mut th_pool = ThreadPool::new();
+    let mut sp = 0;
+    let mut end_of_input = sp == input.len();
     th_pool.add_thread(
         Thread {
             inst: insts,
@@ -165,12 +210,12 @@ pub fn run_vm<I>(insts: Rc<Vec<Inst<I>>>, input: &[I], full_match: bool) -> Opti
             named_capture_index: HashMap::new(),
         },
         0,
+        end_of_input,
     );
 
-    let mut sp = 0;
     let mut matched_thread = None;
     'outer: while sp <= input.len() {
-        let end_of_input = sp == input.len();
+        end_of_input = sp == input.len();
         let mut new_th_pool = ThreadPool::new();
         for th in th_pool.threads.iter() {
             match th.active_inst() {
@@ -186,17 +231,13 @@ pub fn run_vm<I>(insts: Rc<Vec<Inst<I>>>, input: &[I], full_match: bool) -> Opti
                                     named_capture_index: th.named_capture_index.clone(),
                                 },
                                 sp + 1,
+                                sp + 1 == input.len(),
                             );
                         }
                     }
                 }
                 Inst::Match => {
-                    if full_match {
-                        if sp == input.len() {
-                            matched_thread = Some(th.clone());
-                            break 'outer;
-                        }
-                    } else {
+                    if sp == input.len() {
                         matched_thread = Some(th.clone());
                         break 'outer;
                     }

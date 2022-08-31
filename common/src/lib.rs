@@ -80,8 +80,20 @@ impl<'t, I> Captures<'t, I> {
 }
 
 pub trait CompiledRegex<I> {
+    /// Returns true if and only if there is a match for the regex in the slice given.
+    fn is_match(&self, input: &[I]) -> bool;
+
     /// Returns true if and only if match the entire input slice.
-    fn is_full_match(&self, input: &[I]) -> bool;
+    fn is_full_match(&self, input: &[I]) -> bool {
+        if let Some(found_match) = self.find(input) {
+            found_match.start() == 0 && found_match.end() == input.len()
+        } else {
+            false
+        }
+    }
+
+    /// Returns the start and end range of the leftmost-first match in slice. If no match exists, then None is returned.
+    fn find<'t>(&self, input: &'t [I]) -> Option<Match<'t, I>>;
 
     /// Returns the capture groups corresponding to the leftmost-first match in text.
     /// Capture group 0 always corresponds to the entire match. If no match is found, then None is returned.

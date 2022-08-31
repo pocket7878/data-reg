@@ -141,9 +141,15 @@ impl RegexMacroInput {
     }
 
     fn parse_factor(input: ParseStream) -> Result<proc_macro2::TokenStream> {
-        match Self::parse_atom(input) {
-            Ok(atom) => Self::parse_optional_meta_character(input, atom),
-            Err(error) => Err(error),
+        if input.parse::<syn::token::Caret>().is_ok() {
+            Ok(syn::parse_quote!(Regex::begin()))
+        } else if input.parse::<syn::token::Dollar>().is_ok() {
+            Ok(syn::parse_quote!(Regex::end()))
+        } else {
+            match Self::parse_atom(input) {
+                Ok(atom) => Self::parse_optional_meta_character(input, atom),
+                Err(error) => Err(error),
+            }
         }
     }
 
