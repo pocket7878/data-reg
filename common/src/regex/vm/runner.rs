@@ -4,12 +4,13 @@ use std::{
 };
 
 pub use super::inst::Inst;
-use super::inst::{PC, SP};
+use super::inst::{GroupIndex, PC, SP};
 
 pub struct Thread<I> {
     inst: Rc<Vec<Inst<I>>>,
     pub pc: PC,
     pub saved: HashMap<usize, SP>,
+    pub named_capture_index: HashMap<String, GroupIndex>,
 }
 
 impl<I> Thread<I> {
@@ -39,6 +40,7 @@ impl<I> Clone for Thread<I> {
             inst: self.inst.clone(),
             pc: self.pc,
             saved: self.saved.clone(),
+            named_capture_index: self.named_capture_index.clone(),
         }
     }
 }
@@ -63,42 +65,84 @@ impl<I> ThreadPool<I> {
 
         match th.active_inst() {
             Inst::Jmp(x) => {
-                self.add_thread(
-                    Thread {
-                        inst: th.inst.clone(),
-                        pc: *x,
-                        saved: th.saved,
-                    },
-                    sp,
-                );
+                self.add_thread(Thread { pc: *x, ..th }, sp);
             }
             Inst::Split(x, y) => {
                 self.add_thread(
                     Thread {
-                        inst: th.inst.clone(),
                         pc: *x,
+                        inst: th.inst.clone(),
                         saved: th.saved.clone(),
+                        named_capture_index: th.named_capture_index.clone(),
                     },
                     sp,
                 );
                 self.add_thread(
                     Thread {
-                        inst: th.inst.clone(),
                         pc: *y,
+                        inst: th.inst.clone(),
                         saved: th.saved.clone(),
+                        named_capture_index: th.named_capture_index.clone(),
                     },
                     sp,
                 );
             }
-            Inst::Save(save_index) => {
+            Inst::SaveOpen(group_index) => {
                 let mut new_saved = th.saved.clone();
-                new_saved.insert(*save_index, sp);
+                new_saved.insert(*group_index * 2, sp);
 
                 self.add_thread(
                     Thread {
-                        inst: th.inst.clone(),
                         pc: th.pc + 1,
                         saved: new_saved,
+                        inst: th.inst.clone(),
+                        named_capture_index: th.named_capture_index.clone(),
+                    },
+                    sp,
+                );
+            }
+            Inst::SaveClose(group_index) => {
+                let mut new_saved = th.saved.clone();
+                new_saved.insert(*group_index * 2 + 1, sp);
+
+                self.add_thread(
+                    Thread {
+                        pc: th.pc + 1,
+                        saved: new_saved,
+                        inst: th.inst.clone(),
+                        named_capture_index: th.named_capture_index.clone(),
+                    },
+                    sp,
+                );
+            }
+            Inst::SaveNamedOpen(name, group_index) => {
+                let mut new_saved = th.saved.clone();
+                new_saved.insert(*group_index * 2, sp);
+                let mut new_named_capture_index = th.named_capture_index.clone();
+                new_named_capture_index.insert(name.clone(), *group_index);
+
+                self.add_thread(
+                    Thread {
+                        pc: th.pc + 1,
+                        saved: new_saved,
+                        named_capture_index: new_named_capture_index,
+                        inst: th.inst.clone(),
+                    },
+                    sp,
+                );
+            }
+            Inst::SaveNamedClose(name, group_index) => {
+                let mut new_saved = th.saved.clone();
+                new_saved.insert(*group_index * 2 + 1, sp);
+                let mut new_named_capture_index = th.named_capture_index.clone();
+                new_named_capture_index.insert(name.clone(), *group_index);
+
+                self.add_thread(
+                    Thread {
+                        pc: th.pc + 1,
+                        saved: new_saved,
+                        named_capture_index: new_named_capture_index,
+                        inst: th.inst.clone(),
                     },
                     sp,
                 );
@@ -118,6 +162,7 @@ pub fn run_vm<I>(insts: Rc<Vec<Inst<I>>>, input: &[I], full_match: bool) -> Opti
             inst: insts,
             pc: 0,
             saved: HashMap::new(),
+            named_capture_index: HashMap::new(),
         },
         0,
     );
@@ -138,6 +183,7 @@ pub fn run_vm<I>(insts: Rc<Vec<Inst<I>>>, input: &[I], full_match: bool) -> Opti
                                     inst: th.inst.clone(),
                                     pc: th.pc + 1,
                                     saved: th.saved.clone(),
+                                    named_capture_index: th.named_capture_index.clone(),
                                 },
                                 sp + 1,
                             );

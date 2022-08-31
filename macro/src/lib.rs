@@ -9,39 +9,38 @@ struct RegexMacroInput {
 
 impl RegexMacroInput {
     fn parse_any(input: ParseStream) -> Result<proc_macro2::TokenStream> {
-        if input.parse::<syn::Token![.]>().is_ok() {
-            Ok(syn::parse_quote!(Regex::any()))
-        } else {
-            Err(syn::Error::new(input.span(), "expected '.' "))
+        if let Err(err) = input.parse::<syn::Token![.]>() {
+            return Err(err);
         }
+        Ok(syn::parse_quote!(Regex::any()))
     }
 
     // parse [#<ident>] or [#<closure>] syntax to Regex::statisfy
     fn parse_satisfy(input: ParseStream) -> Result<proc_macro2::TokenStream> {
-        if input.peek(syn::token::Bracket) {
-            let braced_content;
-            bracketed!(braced_content in input);
-            let inverse = braced_content.parse::<syn::Token![^]>().is_ok();
-            if let Ok(fn_name) = braced_content.parse::<syn::Ident>() {
-                if inverse {
-                    Ok(syn::parse_quote!(Regex::not_satisfy(#fn_name)))
-                } else {
-                    Ok(syn::parse_quote!(Regex::satisfy(#fn_name)))
-                }
-            } else if let Ok(closure) = braced_content.parse::<syn::ExprClosure>() {
-                if inverse {
-                    Ok(syn::parse_quote!(Regex::not_satisfy(#closure)))
-                } else {
-                    Ok(syn::parse_quote!(Regex::satisfy(#closure)))
-                }
+        if !input.peek(syn::token::Bracket) {
+            return Err(syn::Error::new(input.span(), "expected brace"));
+        }
+
+        let braced_content;
+        bracketed!(braced_content in input);
+        let inverse = braced_content.parse::<syn::Token![^]>().is_ok();
+        if let Ok(fn_name) = braced_content.parse::<syn::Ident>() {
+            if inverse {
+                Ok(syn::parse_quote!(Regex::not_satisfy(#fn_name)))
             } else {
-                Err(syn::Error::new(
-                    input.span(),
-                    "expected closure or function name",
-                ))
+                Ok(syn::parse_quote!(Regex::satisfy(#fn_name)))
+            }
+        } else if let Ok(closure) = braced_content.parse::<syn::ExprClosure>() {
+            if inverse {
+                Ok(syn::parse_quote!(Regex::not_satisfy(#closure)))
+            } else {
+                Ok(syn::parse_quote!(Regex::satisfy(#closure)))
             }
         } else {
-            Err(syn::Error::new(input.span(), "expected brace"))
+            Err(syn::Error::new(
+                input.span(),
+                "expected closure or function name",
+            ))
         }
     }
 
@@ -64,23 +63,21 @@ impl RegexMacroInput {
             braced!(braced_content in input);
             let greedy = input.parse::<syn::token::Question>().is_err();
             if let Ok(n_lit) = braced_content.parse::<syn::LitInt>() {
-                if braced_content.parse::<syn::token::Comma>().is_ok() {
-                    if let Ok(m_lit) = braced_content.parse::<syn::LitInt>() {
-                        Ok(
-                            syn::parse_quote!(Regex::repeat_min_max(#base_regex_expr, #n_lit, #m_lit, #greedy)),
-                        )
-                    } else if braced_content.is_empty() {
-                        Ok(
-                            syn::parse_quote!(Regex::repeat_n_or_more(#base_regex_expr, #n_lit, #greedy)),
-                        )
-                    } else {
-                        Err(syn::Error::new(
-                            braced_content.span(),
-                            "expected integer literal or empty",
-                        ))
-                    }
-                } else {
+                if braced_content.parse::<syn::token::Comma>().is_err() {
                     Ok(syn::parse_quote!(Regex::repeat_n(#base_regex_expr, #n_lit)))
+                } else if let Ok(m_lit) = braced_content.parse::<syn::LitInt>() {
+                    Ok(
+                        syn::parse_quote!(Regex::repeat_min_max(#base_regex_expr, #n_lit, #m_lit, #greedy)),
+                    )
+                } else if braced_content.is_empty() {
+                    Ok(
+                        syn::parse_quote!(Regex::repeat_n_or_more(#base_regex_expr, #n_lit, #greedy)),
+                    )
+                } else {
+                    Err(syn::Error::new(
+                        braced_content.span(),
+                        "expected integer literal or empty",
+                    ))
                 }
             } else {
                 Err(syn::Error::new(input.span(), "expected integer literal"))
@@ -99,13 +96,36 @@ impl RegexMacroInput {
             let parend_content;
             parenthesized!(parend_content in input);
             let mut capturing = true;
-            if parend_content.parse::<syn::token::Question>().is_ok() && parend_content.parse::<syn::token::Colon>().is_ok() {
-                capturing = false;
+            let mut name = None;
+            if parend_content.parse::<syn::token::Question>().is_ok() {
+                if parend_content.parse::<syn::token::Colon>().is_ok() {
+                    capturing = false;
+                } else if parend_content.peek(syn::Ident) {
+                    let parsed_ident = parend_content.parse::<syn::Ident>()?;
+                    if parsed_ident.to_string().as_str() != "P" {
+                        return Err(syn::Error::new(parsed_ident.span(), "expected 'P'"));
+                    }
+                    if let Err(err) = parend_content.parse::<syn::Token![<]>() {
+                        return Err(err);
+                    }
+                    match parend_content.parse::<syn::LitStr>() {
+                        Ok(group_name) => {
+                            name = Some(group_name);
+                        }
+                        Err(err) => return Err(err),
+                    }
+                    if let Err(err) = parend_content.parse::<syn::Token![>]>() {
+                        return Err(err);
+                    }
+                }
             }
             match Self::parse_expr(&parend_content) {
                 Ok(expr) => {
-                    if capturing {
+                    if capturing && name.is_none() {
                         Ok(syn::parse_quote!(Regex::group(#expr)))
+                    } else if capturing && name.is_some() {
+                        let name = name.unwrap();
+                        Ok(syn::parse_quote!(Regex::named_group(#name, #expr)))
                     } else {
                         Ok(syn::parse_quote!(Regex::non_capturing_group(#expr)))
                     }
@@ -115,7 +135,7 @@ impl RegexMacroInput {
         } else {
             Err(syn::Error::new(
                 input.span(),
-                "expreted '.' or {#<ident>} or {#<closure>} or (#<regex>)",
+                "expected '.', {#<ident>}, {#<closure>}, (#<regex>), (?:#<regex>) or (?P<\"name\">#<regex>)",
             ))
         }
     }
@@ -186,23 +206,6 @@ impl From<RegexMacroInput> for proc_macro2::TokenStream {
     }
 }
 
-/// Procedual macro for building vec_reg regex expressions.
-///
-/// - `[#fn_name]` is a syntax for `Regex::satisfy(fn_name)`.
-/// - `[|x| x % 2 == 0]` is a syntax for `Regex::satisfy(|x| x % 2 == 0)`.
-/// - `[^#fn_name]` is a syntax for `Regex::not_satisfy(fn_name)`.
-/// - `[^|x| x % 2 == 0]` is a syntax for `Regex::not_satisfy(|x| x % 2 == 0)`.
-/// - `.` is a syntax for `Regex::any()`.
-/// - `R|S` is a syntax for `Regex::or(R, S)`.
-/// - `RS` is a syntax for `Regex::concat(R, S)`.
-/// - `R*` is a syntax for `Regex::repeat0(R)`.
-/// - `R+` is a syntax for `Regex::repeat1(R)`.
-/// - `R?` is a syntax for `Regex::zero_or_one(R)`.
-/// - `(R)` is a syntax for `Regex::group(R)`.
-/// - `R{n}` is a syntax for `Regex::repeat_n(R, n)`.
-/// - `R{n,}` is a syntax for `Regex::repeat_min_max(R, n, None)`.
-/// - `R{n,m}` is a syntax for `Regex::repeat_min_max(R, n, Some(m))`.
-///
 #[proc_macro]
 pub fn vec_reg(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as RegexMacroInput);

@@ -17,14 +17,15 @@
 //! | Syntax | Description |
 //! |:--|:--|
 //! | `[function_name]` | Match any values that satisfied given function. |
-//! | <code>[&#124;x&#124; *x == 1]</code> | Match any values that satisfied given closure. |
+//! | <code>[\|x\| *x == 1]</code> | Match any values that satisfied given closure. |
 //! | `[^function_name]` | Match any values that not satisfied given function. |
-//! | <code>[&#94;&#124;x&#124; *x == 1]</code> | Match any values that not satisfied given closure. |
+//! | <code>[\^\|x\| *x == 1]</code> | Match any values that not satisfied given closure. |
 //! | `.` | Match any values. |
 //! | `(R)` | numbered capturing group (submatch) |
 //! | `(?:R)` | non-capturing group |
+//! | `(?P<"name">R)` | named & numbered capturing group (submatch) |
 //! | `RS` | `R` followed by `S` |
-//! | <code>R&#124;S</code> | `R` or `S` (prefer `R`) |
+//! | <code>R\|S</code> | `R` or `S` (prefer `R`) |
 //! | `R?` | zero or one `R`, prefer one |
 //! | `R??` | zero or one `R`, prefer zero |
 //! | `R*` | zero or more `R`, prefer more |
@@ -38,7 +39,7 @@
 //! | `R{n}` | exactly `n` `R` |
 //! | `R{n}?` | exactly `n` `R` |
 
-pub use vec_reg_common::{Capture, CompiledRegex, Regex};
+pub use vec_reg_common::{Captures, CompiledRegex, Match, Regex};
 pub use vec_reg_macro::vec_reg;
 
 #[cfg(doctest)]
