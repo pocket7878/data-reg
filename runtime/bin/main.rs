@@ -26,9 +26,7 @@ fn build_target_vec_reg_with_size(n: usize) -> Regex<u32> {
         regs.push(vec_reg!([is_one]));
     }
 
-    regs.into_iter()
-        .reduce(Regex::concat)
-        .unwrap()
+    regs.into_iter().reduce(Regex::concat).unwrap()
 }
 
 fn build_target_vec_reg_array_with_size(n: usize) -> Vec<u32> {

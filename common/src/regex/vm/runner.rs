@@ -1,12 +1,12 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 pub use super::inst::Inst;
 use super::inst::{GroupIndex, PC, SP};
 
 pub struct Thread {
     pub pc: PC,
-    pub saved: HashMap<usize, SP>,
-    pub named_capture_index: HashMap<String, GroupIndex>,
+    pub saved: Rc<HashMap<usize, SP>>,
+    pub named_capture_index: Rc<HashMap<String, GroupIndex>>,
 }
 
 // Define thread equality by PC.
@@ -94,14 +94,16 @@ impl ThreadPool {
                 Inst::SaveOpen(group_index) => {
                     th.pc += 1;
                     if !self.seen_pc[th.pc] {
-                        th.saved.insert(group_index * 2, sp);
+                        let saved_mut = Rc::make_mut(&mut th.saved);
+                        saved_mut.insert(group_index * 2, sp);
                         stack.push(th);
                     }
                 }
                 Inst::SaveClose(group_index) => {
                     th.pc += 1;
                     if !self.seen_pc[th.pc] {
-                        th.saved.insert(group_index * 2 + 1, sp);
+                        let saved_mut = Rc::make_mut(&mut th.saved);
+                        saved_mut.insert(group_index * 2 + 1, sp);
 
                         stack.push(th);
                     }
@@ -109,8 +111,10 @@ impl ThreadPool {
                 Inst::SaveNamedOpen(name, group_index) => {
                     th.pc += 1;
                     if !self.seen_pc[th.pc] {
-                        th.saved.insert(group_index * 2, sp);
-                        th.named_capture_index.insert(name.clone(), *group_index);
+                        let saved_mut = Rc::make_mut(&mut th.saved);
+                        saved_mut.insert(group_index * 2, sp);
+                        let named_capture_index_mut = Rc::make_mut(&mut th.named_capture_index);
+                        named_capture_index_mut.insert(name.clone(), *group_index);
 
                         stack.push(th);
                     }
@@ -118,8 +122,10 @@ impl ThreadPool {
                 Inst::SaveNamedClose(name, group_index) => {
                     th.pc += 1;
                     if !self.seen_pc[th.pc] {
-                        th.saved.insert(group_index * 2 + 1, sp);
-                        th.named_capture_index.insert(name.clone(), *group_index);
+                        let saved_mut = Rc::make_mut(&mut th.saved);
+                        saved_mut.insert(group_index * 2 + 1, sp);
+                        let named_capture_index_mut = Rc::make_mut(&mut th.named_capture_index);
+                        named_capture_index_mut.insert(name.clone(), *group_index);
 
                         stack.push(th);
                     }
@@ -142,8 +148,8 @@ pub fn run_vm<I>(insts: &[Inst<I>], input: &[I]) -> Option<Thread> {
         insts,
         Thread {
             pc: 0,
-            saved: HashMap::new(),
-            named_capture_index: HashMap::new(),
+            saved: Rc::new(HashMap::new()),
+            named_capture_index: Rc::new(HashMap::new()),
         },
         0,
         end_of_input,
