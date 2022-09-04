@@ -12,7 +12,7 @@ impl RegexMacroInput {
         if let Err(err) = input.parse::<syn::Token![.]>() {
             return Err(err);
         }
-        Ok(syn::parse_quote!(Regex::any()))
+        Ok(syn::parse_quote!(vec_reg_common::Regex::any()))
     }
 
     // parse [#<ident>] or [#<closure>] syntax to Regex::statisfy
@@ -26,15 +26,15 @@ impl RegexMacroInput {
         let inverse = braced_content.parse::<syn::Token![^]>().is_ok();
         if let Ok(fn_name) = braced_content.parse::<syn::Ident>() {
             if inverse {
-                Ok(syn::parse_quote!(Regex::not_satisfy(#fn_name)))
+                Ok(syn::parse_quote!(vec_reg_common::Regex::not_satisfy(#fn_name)))
             } else {
-                Ok(syn::parse_quote!(Regex::satisfy(#fn_name)))
+                Ok(syn::parse_quote!(vec_reg_common::Regex::satisfy(#fn_name)))
             }
         } else if let Ok(closure) = braced_content.parse::<syn::ExprClosure>() {
             if inverse {
-                Ok(syn::parse_quote!(Regex::not_satisfy(#closure)))
+                Ok(syn::parse_quote!(vec_reg_common::Regex::not_satisfy(#closure)))
             } else {
-                Ok(syn::parse_quote!(Regex::satisfy(#closure)))
+                Ok(syn::parse_quote!(vec_reg_common::Regex::satisfy(#closure)))
             }
         } else {
             Err(syn::Error::new(
@@ -51,27 +51,27 @@ impl RegexMacroInput {
     ) -> Result<proc_macro2::TokenStream> {
         if input.parse::<syn::token::Question>().is_ok() {
             let greedy = input.parse::<syn::token::Question>().is_err();
-            Ok(syn::parse_quote!(Regex::zero_or_one(#base_regex_expr, #greedy)))
+            Ok(syn::parse_quote!(vec_reg_common::Regex::zero_or_one(#base_regex_expr, #greedy)))
         } else if input.parse::<syn::token::Star>().is_ok() {
             let greedy = input.parse::<syn::token::Question>().is_err();
-            Ok(syn::parse_quote!(Regex::repeat0(#base_regex_expr, #greedy)))
+            Ok(syn::parse_quote!(vec_reg_common::Regex::repeat0(#base_regex_expr, #greedy)))
         } else if input.parse::<syn::Token![+]>().is_ok() {
             let greedy = input.parse::<syn::token::Question>().is_err();
-            Ok(syn::parse_quote!(Regex::repeat1(#base_regex_expr, #greedy)))
+            Ok(syn::parse_quote!(vec_reg_common::Regex::repeat1(#base_regex_expr, #greedy)))
         } else if input.peek(syn::token::Brace) {
             let braced_content;
             braced!(braced_content in input);
             let greedy = input.parse::<syn::token::Question>().is_err();
             if let Ok(n_lit) = braced_content.parse::<syn::LitInt>() {
                 if braced_content.parse::<syn::token::Comma>().is_err() {
-                    Ok(syn::parse_quote!(Regex::repeat_n(#base_regex_expr, #n_lit)))
+                    Ok(syn::parse_quote!(vec_reg_common::Regex::repeat_n(#base_regex_expr, #n_lit)))
                 } else if let Ok(m_lit) = braced_content.parse::<syn::LitInt>() {
                     Ok(
-                        syn::parse_quote!(Regex::repeat_min_max(#base_regex_expr, #n_lit, #m_lit, #greedy)),
+                        syn::parse_quote!(vec_reg_common::Regex::repeat_min_max(#base_regex_expr, #n_lit, #m_lit, #greedy)),
                     )
                 } else if braced_content.is_empty() {
                     Ok(
-                        syn::parse_quote!(Regex::repeat_n_or_more(#base_regex_expr, #n_lit, #greedy)),
+                        syn::parse_quote!(vec_reg_common::Regex::repeat_n_or_more(#base_regex_expr, #n_lit, #greedy)),
                     )
                 } else {
                     Err(syn::Error::new(
@@ -122,12 +122,12 @@ impl RegexMacroInput {
             match Self::parse_expr(&parend_content) {
                 Ok(expr) => {
                     if capturing && name.is_none() {
-                        Ok(syn::parse_quote!(Regex::group(#expr)))
+                        Ok(syn::parse_quote!(vec_reg_common::Regex::group(#expr)))
                     } else if capturing && name.is_some() {
                         let name = name.unwrap();
-                        Ok(syn::parse_quote!(Regex::named_group(#name, #expr)))
+                        Ok(syn::parse_quote!(vec_reg_common::Regex::named_group(#name, #expr)))
                     } else {
-                        Ok(syn::parse_quote!(Regex::non_capturing_group(#expr)))
+                        Ok(syn::parse_quote!(vec_reg_common::Regex::non_capturing_group(#expr)))
                     }
                 }
                 Err(error) => Err(error),
@@ -142,9 +142,9 @@ impl RegexMacroInput {
 
     fn parse_factor(input: ParseStream) -> Result<proc_macro2::TokenStream> {
         if input.parse::<syn::token::Caret>().is_ok() {
-            Ok(syn::parse_quote!(Regex::begin()))
+            Ok(syn::parse_quote!(vec_reg_common::Regex::begin()))
         } else if input.parse::<syn::token::Dollar>().is_ok() {
-            Ok(syn::parse_quote!(Regex::end()))
+            Ok(syn::parse_quote!(vec_reg_common::Regex::end()))
         } else {
             match Self::parse_atom(input) {
                 Ok(atom) => Self::parse_optional_meta_character(input, atom),
@@ -168,7 +168,7 @@ impl RegexMacroInput {
         } else {
             let mut reg = factors[0].clone();
             for f in factors.iter().skip(1) {
-                reg = syn::parse_quote!(Regex::concat(#reg, #f));
+                reg = syn::parse_quote!(vec_reg_common::Regex::concat(#reg, #f));
             }
             Ok(reg)
         }
@@ -185,7 +185,7 @@ impl RegexMacroInput {
 
         let mut reg = terms[0].clone();
         for f in terms.iter().skip(1) {
-            reg = syn::parse_quote!(Regex::or(#reg, #f));
+            reg = syn::parse_quote!(vec_reg_common::Regex::or(#reg, #f));
         }
         Ok(reg)
     }

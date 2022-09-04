@@ -6,7 +6,7 @@ use crate::{CaptureLocation, Captures, CompiledRegex, Match, Regex};
 use super::inst::{GroupIndex, Inst, PC};
 
 pub struct CompiledRegexInVm<I> {
-    insts: Rc<Vec<Inst<I>>>,
+    insts: Vec<Inst<I>>,
 }
 
 impl<I> CompiledRegexInVm<I> {
@@ -27,9 +27,7 @@ impl<I> CompiledRegexInVm<I> {
         );
         let insts = compile_regex_to_vm_insts(&full_match_regex);
 
-        Self {
-            insts: Rc::new(insts),
-        }
+        Self { insts }
     }
 
     #[allow(dead_code)]
@@ -43,11 +41,11 @@ impl<I> CompiledRegexInVm<I> {
 
 impl<I> CompiledRegex<I> for CompiledRegexInVm<I> {
     fn is_match(&self, input: &[I]) -> bool {
-        super::runner::run_vm(self.insts.clone(), input).is_some()
+        super::runner::run_vm(&self.insts, input).is_some()
     }
 
     fn find<'a>(&self, input: &'a [I]) -> Option<Match<'a, I>> {
-        if let Some(matched_thread) = super::runner::run_vm(self.insts.clone(), input) {
+        if let Some(matched_thread) = super::runner::run_vm(&self.insts, input) {
             let saved = matched_thread.saved;
             if let Some(start) = saved.get(&0) {
                 if let Some(end) = saved.get(&1) {
@@ -68,7 +66,7 @@ impl<I> CompiledRegex<I> for CompiledRegexInVm<I> {
     }
 
     fn captures<'a>(&self, input: &'a [I]) -> Option<Captures<'a, I>> {
-        if let Some(matched_thread) = super::runner::run_vm(self.insts.clone(), input) {
+        if let Some(matched_thread) = super::runner::run_vm(&self.insts, input) {
             let saved = matched_thread.saved;
             let mut capture_locations = vec![];
             for i in 0.. {
