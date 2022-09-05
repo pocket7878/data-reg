@@ -1,8 +1,15 @@
 mod regex;
 
-use std::{collections::HashMap, ops::Range};
+use std::{collections::HashMap, ops::Range, rc::Rc};
 
 pub use regex::Regex;
+
+#[cfg(not(target_env = "msvc"))]
+use tikv_jemallocator::Jemalloc;
+
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: Jemalloc = Jemalloc;
 
 #[derive(Debug)]
 pub struct Match<'t, I> {
@@ -50,7 +57,7 @@ struct CaptureLocation {
 pub struct Captures<'t, I> {
     input: &'t [I],
     capture_locations: Vec<CaptureLocation>,
-    named_capture_index: HashMap<String, usize>,
+    named_capture_index: Rc<HashMap<String, usize>>,
 }
 
 impl<'t, I> Captures<'t, I> {

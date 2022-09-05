@@ -1,43 +1,32 @@
-use std::{
-    collections::{HashMap, HashSet},
-    rc::Rc,
-};
+use std::{collections::HashMap, rc::Rc};
 
 pub use super::inst::Inst;
 use super::inst::{GroupIndex, PC, SP};
 
-pub struct Thread<I> {
-    inst: Rc<Vec<Inst<I>>>,
+pub struct Thread {
     pub pc: PC,
-    pub saved: HashMap<usize, SP>,
-    pub named_capture_index: HashMap<String, GroupIndex>,
-}
-
-impl<I> Thread<I> {
-    pub fn active_inst(&self) -> &Inst<I> {
-        self.inst.get(self.pc).unwrap()
-    }
+    pub saved: Rc<HashMap<usize, SP>>,
+    pub named_capture_index: Rc<HashMap<String, GroupIndex>>,
 }
 
 // Define thread equality by PC.
-impl<I> PartialEq for Thread<I> {
+impl PartialEq for Thread {
     fn eq(&self, other: &Self) -> bool {
         self.pc == other.pc
     }
 }
 
-impl<I> Eq for Thread<I> {}
+impl Eq for Thread {}
 
-impl<I> std::hash::Hash for Thread<I> {
+impl std::hash::Hash for Thread {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.pc.hash(state);
     }
 }
 
-impl<I> Clone for Thread<I> {
+impl Clone for Thread {
     fn clone(&self) -> Self {
         Thread {
-            inst: self.inst.clone(),
             pc: self.pc,
             saved: self.saved.clone(),
             named_capture_index: self.named_capture_index.clone(),
@@ -45,169 +34,122 @@ impl<I> Clone for Thread<I> {
     }
 }
 
-struct ThreadPool<I> {
-    seen_pc: HashSet<PC>,
-    threads: Vec<Thread<I>>,
+struct ThreadPool {
+    seen_pc: Vec<bool>,
+    threads: Vec<Thread>,
 }
 
-impl<I> ThreadPool<I> {
-    pub fn new() -> Self {
+impl ThreadPool {
+    pub fn new(size: usize) -> Self {
         Self {
-            seen_pc: HashSet::new(),
-            threads: Vec::new(),
+            seen_pc: vec![false; size],
+            threads: Vec::with_capacity(size),
         }
     }
 
-    pub fn add_thread(&mut self, th: Thread<I>, sp: SP, end_of_input: bool) {
-        if self.seen_pc.contains(&th.pc) {
+    pub fn add_thread<I>(&mut self, insts: &[Inst<I>], th: Thread, sp: SP, end_of_input: bool) {
+        if self.seen_pc[th.pc] {
             return;
         }
 
-        match th.active_inst() {
-            Inst::Begin => {
-                if sp == 0 {
-                    self.add_thread(
-                        Thread {
-                            inst: th.inst.clone(),
-                            pc: th.pc + 1,
+        let mut stack = vec![th];
+        while let Some(mut th) = stack.pop() {
+            let active_inst = &insts[th.pc];
+            match active_inst {
+                Inst::Begin => {
+                    if sp == 0 {
+                        th.pc += 1;
+                        if !self.seen_pc[th.pc] {
+                            stack.push(th);
+                        }
+                    }
+                }
+                Inst::End => {
+                    if end_of_input {
+                        th.pc += 1;
+                        if !self.seen_pc[th.pc] {
+                            stack.push(th);
+                        }
+                    }
+                }
+                Inst::Jmp(x) => {
+                    th.pc = *x;
+                    if !self.seen_pc[th.pc] {
+                        stack.push(th);
+                    }
+                }
+                Inst::Split(x, y) => {
+                    if !self.seen_pc[*y] {
+                        stack.push(Thread {
+                            pc: *y,
                             saved: th.saved.clone(),
                             named_capture_index: th.named_capture_index.clone(),
-                        },
-                        sp,
-                        end_of_input,
-                    );
+                        });
+                    }
+                    if !self.seen_pc[*x] {
+                        th.pc = *x;
+                        stack.push(th);
+                    }
                 }
-            }
-            Inst::End => {
-                if end_of_input {
-                    self.add_thread(
-                        Thread {
-                            inst: th.inst.clone(),
-                            pc: th.pc + 1,
-                            saved: th.saved.clone(),
-                            named_capture_index: th.named_capture_index.clone(),
-                        },
-                        sp,
-                        end_of_input,
-                    );
+                Inst::SaveOpen(group_index) => {
+                    th.pc += 1;
+                    if !self.seen_pc[th.pc] {
+                        let saved_mut = Rc::make_mut(&mut th.saved);
+                        saved_mut.insert(group_index * 2, sp);
+                        stack.push(th);
+                    }
                 }
-            }
-            Inst::Jmp(x) => {
-                self.add_thread(
-                    Thread {
-                        inst: th.inst.clone(),
-                        pc: *x,
-                        saved: th.saved.clone(),
-                        named_capture_index: th.named_capture_index.clone(),
-                    },
-                    sp,
-                    end_of_input,
-                );
-            }
-            Inst::Split(x, y) => {
-                self.add_thread(
-                    Thread {
-                        pc: *x,
-                        inst: th.inst.clone(),
-                        saved: th.saved.clone(),
-                        named_capture_index: th.named_capture_index.clone(),
-                    },
-                    sp,
-                    end_of_input,
-                );
-                self.add_thread(
-                    Thread {
-                        pc: *y,
-                        inst: th.inst.clone(),
-                        saved: th.saved.clone(),
-                        named_capture_index: th.named_capture_index.clone(),
-                    },
-                    sp,
-                    end_of_input,
-                );
-            }
-            Inst::SaveOpen(group_index) => {
-                let mut new_saved = th.saved.clone();
-                new_saved.insert(*group_index * 2, sp);
+                Inst::SaveClose(group_index) => {
+                    th.pc += 1;
+                    if !self.seen_pc[th.pc] {
+                        let saved_mut = Rc::make_mut(&mut th.saved);
+                        saved_mut.insert(group_index * 2 + 1, sp);
 
-                self.add_thread(
-                    Thread {
-                        pc: th.pc + 1,
-                        saved: new_saved,
-                        inst: th.inst.clone(),
-                        named_capture_index: th.named_capture_index.clone(),
-                    },
-                    sp,
-                    end_of_input,
-                );
-            }
-            Inst::SaveClose(group_index) => {
-                let mut new_saved = th.saved.clone();
-                new_saved.insert(*group_index * 2 + 1, sp);
+                        stack.push(th);
+                    }
+                }
+                Inst::SaveNamedOpen(name, group_index) => {
+                    th.pc += 1;
+                    if !self.seen_pc[th.pc] {
+                        let saved_mut = Rc::make_mut(&mut th.saved);
+                        saved_mut.insert(group_index * 2, sp);
+                        let named_capture_index_mut = Rc::make_mut(&mut th.named_capture_index);
+                        named_capture_index_mut.insert(name.clone(), *group_index);
 
-                self.add_thread(
-                    Thread {
-                        pc: th.pc + 1,
-                        saved: new_saved,
-                        inst: th.inst.clone(),
-                        named_capture_index: th.named_capture_index.clone(),
-                    },
-                    sp,
-                    end_of_input,
-                );
-            }
-            Inst::SaveNamedOpen(name, group_index) => {
-                let mut new_saved = th.saved.clone();
-                new_saved.insert(*group_index * 2, sp);
-                let mut new_named_capture_index = th.named_capture_index.clone();
-                new_named_capture_index.insert(name.clone(), *group_index);
+                        stack.push(th);
+                    }
+                }
+                Inst::SaveNamedClose(name, group_index) => {
+                    th.pc += 1;
+                    if !self.seen_pc[th.pc] {
+                        let saved_mut = Rc::make_mut(&mut th.saved);
+                        saved_mut.insert(group_index * 2 + 1, sp);
+                        let named_capture_index_mut = Rc::make_mut(&mut th.named_capture_index);
+                        named_capture_index_mut.insert(name.clone(), *group_index);
 
-                self.add_thread(
-                    Thread {
-                        pc: th.pc + 1,
-                        saved: new_saved,
-                        named_capture_index: new_named_capture_index,
-                        inst: th.inst.clone(),
-                    },
-                    sp,
-                    end_of_input,
-                );
-            }
-            Inst::SaveNamedClose(name, group_index) => {
-                let mut new_saved = th.saved.clone();
-                new_saved.insert(*group_index * 2 + 1, sp);
-                let mut new_named_capture_index = th.named_capture_index.clone();
-                new_named_capture_index.insert(name.clone(), *group_index);
-
-                self.add_thread(
-                    Thread {
-                        pc: th.pc + 1,
-                        saved: new_saved,
-                        named_capture_index: new_named_capture_index,
-                        inst: th.inst.clone(),
-                    },
-                    sp,
-                    end_of_input,
-                );
-            }
-            _ => {
-                self.seen_pc.insert(th.pc);
-                self.threads.push(th);
+                        stack.push(th);
+                    }
+                }
+                _ => {
+                    self.seen_pc[th.pc] = true;
+                    self.threads.push(th);
+                }
             }
         }
     }
 }
 
-pub fn run_vm<I>(insts: Rc<Vec<Inst<I>>>, input: &[I]) -> Option<Thread<I>> {
-    let mut th_pool = ThreadPool::new();
+pub fn run_vm<I>(insts: &[Inst<I>], input: &[I]) -> Option<Thread> {
+    let prog_size = insts.len();
+    let mut clist = ThreadPool::new(prog_size);
     let mut sp = 0;
     let mut end_of_input = sp == input.len();
-    th_pool.add_thread(
+    clist.add_thread(
+        insts,
         Thread {
-            inst: insts,
             pc: 0,
-            saved: HashMap::new(),
-            named_capture_index: HashMap::new(),
+            saved: Rc::new(HashMap::new()),
+            named_capture_index: Rc::new(HashMap::new()),
         },
         0,
         end_of_input,
@@ -216,29 +158,21 @@ pub fn run_vm<I>(insts: Rc<Vec<Inst<I>>>, input: &[I]) -> Option<Thread<I>> {
     let mut matched_thread = None;
     'outer: while sp <= input.len() {
         end_of_input = sp == input.len();
-        let mut new_th_pool = ThreadPool::new();
-        for th in th_pool.threads.iter() {
-            match th.active_inst() {
+        let mut nlist = ThreadPool::new(prog_size);
+        for mut th in clist.threads.into_iter() {
+            match &insts[th.pc] {
                 Inst::Check(f) => {
                     if !end_of_input {
                         let i = &input[sp];
                         if f(i) {
-                            new_th_pool.add_thread(
-                                Thread {
-                                    inst: th.inst.clone(),
-                                    pc: th.pc + 1,
-                                    saved: th.saved.clone(),
-                                    named_capture_index: th.named_capture_index.clone(),
-                                },
-                                sp + 1,
-                                sp + 1 == input.len(),
-                            );
+                            th.pc += 1;
+                            nlist.add_thread(insts, th, sp + 1, sp + 1 == input.len());
                         }
                     }
                 }
                 Inst::Match => {
                     if sp == input.len() {
-                        matched_thread = Some(th.clone());
+                        matched_thread = Some(th);
                         break 'outer;
                     }
                 }
@@ -250,7 +184,8 @@ pub fn run_vm<I>(insts: Rc<Vec<Inst<I>>>, input: &[I]) -> Option<Thread<I>> {
                 }
             }
         }
-        th_pool = new_th_pool;
+
+        clist = nlist;
         sp += 1;
     }
 

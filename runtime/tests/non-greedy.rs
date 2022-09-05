@@ -1,4 +1,4 @@
-use vec_reg::{vec_reg, CompiledRegex, Regex};
+use vec_reg::{vec_reg, CompiledRegex};
 
 #[test]
 fn non_greedy_repeat0() {

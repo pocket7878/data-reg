@@ -4,3 +4,6 @@ members = [
 	"macro",
 	"common"
 ]
+
+[profile.release]
+lto = true
